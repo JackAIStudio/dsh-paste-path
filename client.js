@@ -107,24 +107,15 @@ function setDragActive(active) {
   }
 }
 
+let inResetDrag = false
 function resetDrag() {
-  dragDepth = 0
-  setDragActive(false)
-  if (typeof window !== 'undefined') {
-    try {
-      window.dispatchEvent(new Event('dragend'))
-      window.dispatchEvent(new DragEvent('dragend'))
-    } catch {}
-  }
-  if (typeof document !== 'undefined') {
-    try {
-      const masks = document.querySelectorAll('div[role="status"]')
-      for (const el of masks) {
-        if (el.textContent && el.textContent.includes('图片拖动到此处')) {
-          el.style.display = 'none'
-        }
-      }
-    } catch {}
+  if (inResetDrag) return
+  inResetDrag = true
+  try {
+    dragDepth = 0
+    setDragActive(false)
+  } finally {
+    inResetDrag = false
   }
 }
 
