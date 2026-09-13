@@ -2,7 +2,7 @@ window.__ModuleLoader__.load({
   id: 'dsh-paste-path',
   factory: (require) => {
     const module = { exports: {} }
-    const css = ".dshpp-btn {\n  appearance: none;\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  height: 24px;\n  padding: 0 8px;\n  border: 1px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, 0.2));\n  border-radius: 12px;\n  background: var(--dsw-alias-bg-layer-2, transparent);\n  color: var(--dsw-alias-label-secondary, #666);\n  font: inherit;\n  font-size: 11px;\n  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;\n  line-height: 24px;\n  cursor: pointer;\n  user-select: none;\n  white-space: nowrap;\n  transition: all 120ms ease;\n}\n\n.dshpp-btn:hover {\n  background: var(--dsw-alias-interactive-bg-hover, rgba(128, 128, 128, 0.12));\n  color: var(--dsw-alias-label-primary, #111);\n  border-color: var(--dsw-alias-brand-primary, #2563eb);\n}\n\n.dshpp-btn.is-ready {\n  background: rgba(37, 99, 235, 0.08);\n  border-color: rgba(37, 99, 235, 0.35);\n  color: var(--dsw-alias-brand-primary, #2563eb);\n}\n\n.dshpp-btn kbd {\n  margin: 0 1px;\n  padding: 1px 4px;\n  border: 1px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, 0.25));\n  border-radius: 4px;\n  font: inherit;\n  font-size: 10px;\n  background: var(--dsw-alias-bg-layer-1, rgba(255, 255, 255, 0.2));\n}\n\n.dshpp-btn-icon {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  flex-shrink: 0;\n}\n\n.dshpp-toast {\n  position: fixed;\n  right: 20px;\n  bottom: 84px;\n  max-width: 420px;\n  padding: 8px 14px;\n  border-radius: 8px;\n  background: var(--dsw-alias-bg-layer-3, #1e293b);\n  color: var(--dsw-alias-label-primary, #f8fafc);\n  font-size: 12px;\n  line-height: 18px;\n  pointer-events: none;\n  box-shadow: var(--dsw-shadow-lv3, 0 10px 15px -3px rgba(0, 0, 0, 0.3));\n  z-index: 1000;\n  animation: dshppFadeIn 150ms ease;\n  word-break: break-all;\n}\n\n.dshpp-toast.is-error {\n  background: #dc2626;\n  color: #ffffff;\n}\n\n.dshpp-drop-overlay {\n  position: fixed;\n  inset: 0;\n  z-index: 999;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  background: rgba(15, 23, 42, 0.65);\n  backdrop-filter: blur(4px);\n  pointer-events: none;\n  animation: dshppFadeIn 120ms ease;\n}\n\n.dshpp-drop-card {\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  gap: 12px;\n  padding: 24px 36px;\n  border-radius: 16px;\n  border: 2px dashed rgba(255, 255, 255, 0.4);\n  background: rgba(30, 41, 59, 0.85);\n  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);\n  color: #fff;\n  text-align: center;\n}\n\n.dshpp-drop-card-icon {\n  color: #60a5fa;\n}\n\n.dshpp-drop-card-title {\n  font-size: 16px;\n  font-weight: 600;\n}\n\n.dshpp-drop-card-desc {\n  font-size: 13px;\n  color: #94a3b8;\n}\n\n@keyframes dshppFadeIn {\n  from { opacity: 0; transform: scale(0.98); }\n  to { opacity: 1; transform: scale(1); }\n}\n\n/* 彻底压制原生限制图片的蒙层，防止全屏卡死 */\nbody[data-dshpp-drag=\"true\"] div[role=\"status\"]:has(> div[class*=\"illustration\"]),\nbody[data-dshpp-drag=\"true\"] div[class*=\"_mask\"]:has(div[class*=\"_illustration\"]),\nbody[data-dshpp-drag=\"true\"] div[class*=\"BInVoG_mask\"] {\n  display: none !important;\n  opacity: 0 !important;\n  pointer-events: none !important;\n}\n"
+    const css = ".dshpp-btn {\n  appearance: none;\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  height: 24px;\n  padding: 0 8px;\n  border: 1px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, 0.2));\n  border-radius: 12px;\n  background: var(--dsw-alias-bg-layer-2, transparent);\n  color: var(--dsw-alias-label-secondary, #666);\n  font: inherit;\n  font-size: 11px;\n  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;\n  line-height: 24px;\n  cursor: pointer;\n  user-select: none;\n  white-space: nowrap;\n  transition: all 120ms ease;\n}\n\n.dshpp-btn:hover {\n  background: var(--dsw-alias-interactive-bg-hover, rgba(128, 128, 128, 0.12));\n  color: var(--dsw-alias-label-primary, #111);\n  border-color: var(--dsw-alias-brand-primary, #2563eb);\n}\n\n.dshpp-btn.is-ready {\n  background: rgba(37, 99, 235, 0.08);\n  border-color: rgba(37, 99, 235, 0.35);\n  color: var(--dsw-alias-brand-primary, #2563eb);\n}\n\n.dshpp-btn kbd {\n  margin: 0 1px;\n  padding: 1px 4px;\n  border: 1px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, 0.25));\n  border-radius: 4px;\n  font: inherit;\n  font-size: 10px;\n  background: var(--dsw-alias-bg-layer-1, rgba(255, 255, 255, 0.2));\n}\n\n.dshpp-btn-icon {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  flex-shrink: 0;\n}\n\n.dshpp-toast {\n  position: fixed;\n  right: 20px;\n  bottom: 84px;\n  max-width: 420px;\n  padding: 8px 14px;\n  border-radius: 8px;\n  background: var(--dsw-alias-bg-layer-3, #1e293b);\n  color: var(--dsw-alias-label-primary, #f8fafc);\n  font-size: 12px;\n  line-height: 18px;\n  pointer-events: none;\n  box-shadow: var(--dsw-shadow-lv3, 0 10px 15px -3px rgba(0, 0, 0, 0.3));\n  z-index: 1000;\n  animation: dshppFadeIn 150ms ease;\n  word-break: break-all;\n}\n\n.dshpp-toast.is-error {\n  background: #dc2626;\n  color: #ffffff;\n}\n\n/* 拖拽时输入框高亮，轻巧优雅，不挡视线 */\n[data-composer-card].dshpp-drag-over,\ndiv[data-composer-input=\"true\"].dshpp-drag-over {\n  border-color: var(--dsw-alias-brand-primary, #2563eb) !important;\n  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.3) !important;\n  transition: all 120ms ease;\n}\n\n/* 彻底隐藏原生容易卡死且限制图片的全屏蒙层 */\ndiv[role=\"status\"]:has(> div[class*=\"illustration\"]),\ndiv[class*=\"_mask\"]:has(div[class*=\"_illustration\"]),\ndiv[class*=\"BInVoG_mask\"] {\n  display: none !important;\n  opacity: 0 !important;\n  pointer-events: none !important;\n}\n\n@keyframes dshppFadeIn {\n  from { opacity: 0; transform: translateY(4px); }\n  to { opacity: 1; transform: translateY(0); }\n}\n"
     if (typeof document !== 'undefined') {
       const id = 'dsh-paste-path/ui.css'
       let tag = document.querySelector('style[data-plugin-css=' + JSON.stringify(id) + ']')
@@ -98,13 +98,13 @@ function applyPeek(ready) {
 }
 
 function setDragActive(active) {
-  if (dragActiveState === active) return
-  dragActiveState = active
-  if (typeof document !== 'undefined' && document.body) {
-    if (active) document.body.setAttribute('data-dshpp-drag', 'true')
-    else document.body.removeAttribute('data-dshpp-drag')
+  if (typeof document !== 'undefined') {
+    const card = document.querySelector('[data-composer-card]') || document.querySelector('div[data-composer-input="true"]')
+    if (card) {
+      if (active) card.classList.add('dshpp-drag-over')
+      else card.classList.remove('dshpp-drag-over')
+    }
   }
-  emit(dragListeners)
 }
 
 function resetDrag() {
@@ -472,69 +472,24 @@ function PathButton() {
   )
 }
 
-function DropOverlayContainer() {
-  const [dragActive, setLocalDragActive] = React.useState(dragActiveState)
+function ToastOverlay() {
   const [toast, setToast] = React.useState(toastState)
 
   React.useEffect(() => {
-    const dragListener = () => setLocalDragActive(dragActiveState)
-    dragListeners.add(dragListener)
     const toastListener = () => setToast(toastState)
     toastListeners.add(toastListener)
     return () => {
-      dragListeners.delete(dragListener)
       toastListeners.delete(toastListener)
     }
   }, [])
 
-  return React.createElement(
-    React.Fragment,
-    null,
-    dragActive &&
-      React.createElement(
-        'div',
-        { className: 'dshpp-drop-overlay' },
-        React.createElement(
-          'div',
-          { className: 'dshpp-drop-card' },
-          React.createElement(
-            'div',
-            { className: 'dshpp-drop-card-icon' },
-            React.createElement(
-              'svg',
-              {
-                width: '36',
-                height: '36',
-                viewBox: '0 0 24 24',
-                fill: 'none',
-                stroke: 'currentColor',
-                strokeWidth: '2',
-                strokeLinecap: 'round',
-                strokeLinejoin: 'round',
-              },
-              React.createElement('path', {
-                d: 'M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z',
-              }),
-              React.createElement('polyline', { points: '13 2 13 9 20 9' }),
-              React.createElement('line', { x1: '12', y1: '11', x2: '12', y2: '17' }),
-              React.createElement('polyline', { points: '9 14 12 17 15 14' })
-            )
-          ),
-          React.createElement('div', { className: 'dshpp-drop-card-title' }, '释放以填入绝对路径'),
-          React.createElement(
-            'div',
-            { className: 'dshpp-drop-card-desc' },
-            '自动将文件或文件夹在系统中的完整路径注入到输入框中'
-          )
-        )
-      ),
-    toast !== null &&
-      React.createElement(
+  return toast !== null
+    ? React.createElement(
         'div',
         { className: toast.isError ? 'dshpp-toast is-error' : 'dshpp-toast' },
         toast.text
       )
-  )
+    : null
 }
 
 function apply(ctx) {
@@ -599,7 +554,7 @@ function apply(ctx) {
       if (toastTimer !== null) clearTimeout(toastTimer)
       toastListeners.clear()
       peekListeners.clear()
-      dragListeners.clear()
+      
     })
   }
 
@@ -612,11 +567,11 @@ function apply(ctx) {
       )
     )
 
-    // Register Global Drop Overlay & Toast in shell overlay
+    // Register Toast in shell overlay (no heavy modal/overlay)
     slots.inject('shell.overlay', () =>
       slots.register(
-        { name: 'shell.overlay', id: 'dsh-paste-path-overlay', order: 90, label: '拖拽路径与提示' },
-        () => React.createElement(DropOverlayContainer, null)
+        { name: 'shell.overlay', id: 'dsh-paste-path-overlay', order: 90, label: '路径粘贴提示' },
+        () => React.createElement(ToastOverlay, null)
       )
     )
   }

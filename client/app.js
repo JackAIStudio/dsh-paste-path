@@ -82,13 +82,13 @@ function applyPeek(ready) {
 }
 
 function setDragActive(active) {
-  if (dragActiveState === active) return
-  dragActiveState = active
-  if (typeof document !== 'undefined' && document.body) {
-    if (active) document.body.setAttribute('data-dshpp-drag', 'true')
-    else document.body.removeAttribute('data-dshpp-drag')
+  if (typeof document !== 'undefined') {
+    const card = document.querySelector('[data-composer-card]') || document.querySelector('div[data-composer-input="true"]')
+    if (card) {
+      if (active) card.classList.add('dshpp-drag-over')
+      else card.classList.remove('dshpp-drag-over')
+    }
   }
-  emit(dragListeners)
 }
 
 function resetDrag() {
@@ -456,69 +456,24 @@ function PathButton() {
   )
 }
 
-function DropOverlayContainer() {
-  const [dragActive, setLocalDragActive] = React.useState(dragActiveState)
+function ToastOverlay() {
   const [toast, setToast] = React.useState(toastState)
 
   React.useEffect(() => {
-    const dragListener = () => setLocalDragActive(dragActiveState)
-    dragListeners.add(dragListener)
     const toastListener = () => setToast(toastState)
     toastListeners.add(toastListener)
     return () => {
-      dragListeners.delete(dragListener)
       toastListeners.delete(toastListener)
     }
   }, [])
 
-  return React.createElement(
-    React.Fragment,
-    null,
-    dragActive &&
-      React.createElement(
-        'div',
-        { className: 'dshpp-drop-overlay' },
-        React.createElement(
-          'div',
-          { className: 'dshpp-drop-card' },
-          React.createElement(
-            'div',
-            { className: 'dshpp-drop-card-icon' },
-            React.createElement(
-              'svg',
-              {
-                width: '36',
-                height: '36',
-                viewBox: '0 0 24 24',
-                fill: 'none',
-                stroke: 'currentColor',
-                strokeWidth: '2',
-                strokeLinecap: 'round',
-                strokeLinejoin: 'round',
-              },
-              React.createElement('path', {
-                d: 'M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z',
-              }),
-              React.createElement('polyline', { points: '13 2 13 9 20 9' }),
-              React.createElement('line', { x1: '12', y1: '11', x2: '12', y2: '17' }),
-              React.createElement('polyline', { points: '9 14 12 17 15 14' })
-            )
-          ),
-          React.createElement('div', { className: 'dshpp-drop-card-title' }, '释放以填入绝对路径'),
-          React.createElement(
-            'div',
-            { className: 'dshpp-drop-card-desc' },
-            '自动将文件或文件夹在系统中的完整路径注入到输入框中'
-          )
-        )
-      ),
-    toast !== null &&
-      React.createElement(
+  return toast !== null
+    ? React.createElement(
         'div',
         { className: toast.isError ? 'dshpp-toast is-error' : 'dshpp-toast' },
         toast.text
       )
-  )
+    : null
 }
 
 function apply(ctx) {
@@ -583,7 +538,7 @@ function apply(ctx) {
       if (toastTimer !== null) clearTimeout(toastTimer)
       toastListeners.clear()
       peekListeners.clear()
-      dragListeners.clear()
+      
     })
   }
 
@@ -596,11 +551,11 @@ function apply(ctx) {
       )
     )
 
-    // Register Global Drop Overlay & Toast in shell overlay
+    // Register Toast in shell overlay (no heavy modal/overlay)
     slots.inject('shell.overlay', () =>
       slots.register(
-        { name: 'shell.overlay', id: 'dsh-paste-path-overlay', order: 90, label: '拖拽路径与提示' },
-        () => React.createElement(DropOverlayContainer, null)
+        { name: 'shell.overlay', id: 'dsh-paste-path-overlay', order: 90, label: '路径粘贴提示' },
+        () => React.createElement(ToastOverlay, null)
       )
     )
   }

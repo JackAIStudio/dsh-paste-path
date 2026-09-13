@@ -189,28 +189,43 @@ async function fallbackFindPath(name, size) {
   }
 }
 
-async function resolveDroppedFiles(files) {
+async function resolveDroppedFiles(files, cache) {
   if (!Array.isArray(files) || files.length === 0) return []
 
   // 1. Try Finder selection first (best and exact for files dragged from Finder)
   const finderPaths = await getFinderSelectionPaths()
   if (finderPaths.length > 0) {
-    // If number of dropped files matches selection, or names align
+    if (files.length === 1) {
+      // Single file or folder dropped
+      const hit = finderPaths.find(p => path.basename(p) === files[0].name)
+      return [hit || finderPaths[0]]
+    }
     if (finderPaths.length === files.length) {
       return finderPaths
     }
     const matched = []
     for (const f of files) {
-      const match = finderPaths.find(p => path.basename(p) === f.name)
-      if (match) matched.push(match)
+      const hit = finderPaths.find(p => path.basename(p) === f.name)
+      if (hit) matched.push(hit)
     }
-    if (matched.length === files.length) return matched
     if (matched.length > 0) return matched
-    // Even if names slightly differ, if 1 file dropped and 1 in selection, take selection
-    if (files.length === 1 && finderPaths.length === 1) return finderPaths
+    return finderPaths
   }
 
-  // 2. Fallback to mdfind search per file
+  // 2. Try clipboard paths as second heuristic (user may have selected/copied file)
+  try {
+    const clip = await readClipboardPaths(cache || { lastChangeCount: null, lastResult: null })
+    if (clip && clip.ready && clip.paths.length > 0) {
+      const cPaths = clip.paths.map(p => p.path)
+      if (files.length === 1) {
+        const hit = cPaths.find(p => path.basename(p) === files[0].name)
+        if (hit) return [hit]
+        if (!files[0].name) return [cPaths[0]]
+      }
+    }
+  } catch {}
+
+  // 3. Fallback to mdfind search per file
   const resolved = []
   for (const f of files) {
     if (!f || !f.name) continue
@@ -306,7 +321,7 @@ function registerRoutes(ctx) {
         try {
           const body = await readBodyJson(req)
           const files = Array.isArray(body.files) ? body.files : []
-          const paths = await resolveDroppedFiles(files)
+          const paths = await resolveDroppedFiles(files, cache)
           sendJson(res, 200, { ok: true, paths })
         } catch (error) {
           sendJson(res, 500, { error: errorMessage(error) })
