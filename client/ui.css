@@ -1,0 +1,118 @@
+.dshpp-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, 0.2));
+  border-radius: 12px;
+  background: var(--dsw-alias-bg-layer-2, transparent);
+  color: var(--dsw-alias-label-secondary, #666);
+  font: inherit;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  line-height: 24px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: all 120ms ease;
+}
+
+.dshpp-btn:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(128, 128, 128, 0.12));
+  color: var(--dsw-alias-label-primary, #111);
+  border-color: var(--dsw-alias-brand-primary, #2563eb);
+}
+
+.dshpp-btn.is-ready {
+  background: rgba(37, 99, 235, 0.08);
+  border-color: rgba(37, 99, 235, 0.35);
+  color: var(--dsw-alias-brand-primary, #2563eb);
+}
+
+.dshpp-btn kbd {
+  margin: 0 1px;
+  padding: 1px 4px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, 0.25));
+  border-radius: 4px;
+  font: inherit;
+  font-size: 10px;
+  background: var(--dsw-alias-bg-layer-1, rgba(255, 255, 255, 0.2));
+}
+
+.dshpp-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dshpp-toast {
+  position: fixed;
+  right: 20px;
+  bottom: 84px;
+  max-width: 420px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-3, #1e293b);
+  color: var(--dsw-alias-label-primary, #f8fafc);
+  font-size: 12px;
+  line-height: 18px;
+  pointer-events: none;
+  box-shadow: var(--dsw-shadow-lv3, 0 10px 15px -3px rgba(0, 0, 0, 0.3));
+  z-index: 1000;
+  animation: dshppFadeIn 150ms ease;
+  word-break: break-all;
+}
+
+.dshpp-toast.is-error {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.dshpp-drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+  animation: dshppFadeIn 120ms ease;
+}
+
+.dshpp-drop-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 36px;
+  border-radius: 16px;
+  border: 2px dashed rgba(255, 255, 255, 0.4);
+  background: rgba(30, 41, 59, 0.85);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+  color: #fff;
+  text-align: center;
+}
+
+.dshpp-drop-card-icon {
+  color: #60a5fa;
+}
+
+.dshpp-drop-card-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.dshpp-drop-card-desc {
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+@keyframes dshppFadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}

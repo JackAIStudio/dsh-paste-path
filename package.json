@@ -1,0 +1,56 @@
+{
+  "name": "dsh-paste-path",
+  "version": "0.2.0",
+  "description": "DeepSeek Harness plugin: Smart drag-and-drop for any files/folders and Finder clipboard path pasting (Ctrl+V / Button)",
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "client",
+    "paths.js",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "@deepseek-ai/dsh-client-ui-slots": ">=0.0.1-rc.1 <0.1.0 || >=0.1.0-rc.1 <0.2.0-0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-slots"
+      ],
+      "platform": "web"
+    }
+  },
+  "scripts": {
+    "pack": "node scripts/pack-client.js",
+    "test": "node scripts/pack-client.js && node --check index.js && node --check paths.js && node --check client.js"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "cordis",
+    "finder",
+    "clipboard",
+    "drag-drop",
+    "absolute-path"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  }
+}
