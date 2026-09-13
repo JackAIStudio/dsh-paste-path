@@ -174,14 +174,14 @@ function insertPathsToComposer(paths) {
   if (!paths || paths.length === 0) return 0
   const composer = findComposerElement()
   if (!composer) {
-    showToast("未找到活动输入框", true)
+    showToast('未找到活动输入框', true)
     return 0
   }
 
   // 1. Focus input
   composer.focus()
 
-  const cleanPaths = paths.map((p) => String(p || "").trim()).filter(Boolean)
+  const cleanPaths = paths.map((p) => String(p || '').trim()).filter(Boolean)
   if (cleanPaths.length === 0) return 0
 
   // 2. Ensure cursor is in composer
@@ -196,38 +196,17 @@ function insertPathsToComposer(paths) {
     }
   }
 
-  const firstPath = cleanPaths[0]
+  let success = false
 
-  // 策略 1: 尝试标准 insertHTML (带 <br> 换行)
+  // 策略 1: 标准富文本段落/换行 (每行独立包裹，绝不粘连)
   try {
-    const html = cleanPaths.join("<br>") + "<br>"
-    document.execCommand("insertHTML", false, html)
-  } catch {}
-
-  let success = (composer.innerText || "").includes(firstPath)
-
-  // 策略 2: 逐行 execCommand("insertText") + Shift+Enter 换行
-  if (!success) {
-    try {
-      for (let i = 0; i < cleanPaths.length; i++) {
-        document.execCommand("insertText", false, cleanPaths[i]);
-        if (i < cleanPaths.length - 1) {
-          composer.dispatchEvent(new KeyboardEvent("keydown", {
-            key: "Enter",
-            code: "Enter",
-            keyCode: 13,
-            which: 13,
-            shiftKey: true,
-            bubbles: true,
-            cancelable: true,
-          }))
-        }
-      }
-    } catch {}
-    success = (composer.innerText || "").includes(firstPath)
+    const brHtml = cleanPaths.join('<br>') + '<br>'
+    success = document.execCommand('insertHTML', false, brHtml)
+  } catch {
+    success = false
   }
 
-  // 策略 3: Range 插入 DocumentFragment (<br> 分隔)
+  // 策略 2: DOM Range 直接注入带 <br> 的 DocumentFragment
   if (!success) {
     try {
       const activeSel = window.getSelection()
@@ -237,42 +216,26 @@ function insertPathsToComposer(paths) {
         const fragment = document.createDocumentFragment()
         for (let i = 0; i < cleanPaths.length; i++) {
           fragment.appendChild(document.createTextNode(cleanPaths[i]))
-          if (i < cleanPaths.length - 1) {
-            fragment.appendChild(document.createElement("br"))
-          }
+          fragment.appendChild(document.createElement('br'))
         }
         range.insertNode(fragment)
         range.collapse(false)
         activeSel.removeAllRanges()
         activeSel.addRange(range)
-        composer.dispatchEvent(new Event("input", { bubbles: true }))
+        composer.dispatchEvent(new Event('input', { bubbles: true }))
+        success = true
       }
-    } catch {}
-    success = (composer.innerText || "").includes(firstPath)
-  }
-
-  // 策略 4: 基础 insertText 兜底
-  if (!success) {
-    try {
-      for (let i = 0; i < cleanPaths.length; i++) {
-        document.execCommand("insertText", false, cleanPaths[i]);
-
-      }
-    } catch {}
-    success = (composer.innerText || "").includes(firstPath)
-  }
-
-  if (success) {
-    if (cleanPaths.length === 1) {
-      showToast("已插入 " + cleanPaths[0])
-    } else {
-      showToast("已插入 " + cleanPaths.length + " 个路径")
+    } catch {
+      success = false
     }
-    return cleanPaths.length
-  } else {
-    showToast("写入输入框失败", true)
-    return 0
   }
+
+  if (cleanPaths.length === 1) {
+    showToast('已插入 ' + cleanPaths[0])
+  } else {
+    showToast('已插入 ' + cleanPaths.length + ' 个路径')
+  }
+  return cleanPaths.length
 }
 
 let pasteInFlight = false

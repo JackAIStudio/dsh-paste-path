@@ -266,7 +266,13 @@ function registerRoutes(ctx) {
           return
         }
         try {
-          const result = await readClipboardPaths(cache)
+          let result = await readClipboardPaths(cache)
+          if (!result.ready) {
+            const fPaths = await getFinderSelectionPaths()
+            if (fPaths.length > 0) {
+              result = { ready: true, count: fPaths.length }
+            }
+          }
           sendJson(res, 200, { ready: result.ready, count: result.count })
         } catch (error) {
           sendJson(res, 500, { error: errorMessage(error) })
@@ -289,11 +295,17 @@ function registerRoutes(ctx) {
           return
         }
         try {
-          const result = await readClipboardPaths(cache)
-          if (!result.ready) {
+          let result = await readClipboardPaths(cache)
+          if (!result.ready || result.paths.length === 0) {
+            const fPaths = await getFinderSelectionPaths()
+            if (fPaths.length > 0) {
+              result = { ready: true, count: fPaths.length, paths: fPaths.map(p => ({ path: p, ok: true })) }
+            }
+          }
+          if (!result.ready || result.paths.length === 0) {
             sendJson(res, 200, {
               paths: [],
-              error: result.error || '剪贴板里没有文件路径。请先在 Finder 里选中文件或文件夹，按 Cmd+C，再回到这里点击或按 Ctrl+V。',
+              error: '剪贴板与访达中均未发现选中的文件路径。请在访达中选中文件后重试。',
             })
             return
           }
