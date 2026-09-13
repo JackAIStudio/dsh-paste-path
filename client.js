@@ -2,7 +2,7 @@ window.__ModuleLoader__.load({
   id: 'dsh-paste-path',
   factory: (require) => {
     const module = { exports: {} }
-    const css = ".dshpp-btn {\n  appearance: none;\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  height: 24px;\n  padding: 0 8px;\n  border: 1px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, 0.2));\n  border-radius: 12px;\n  background: var(--dsw-alias-bg-layer-2, transparent);\n  color: var(--dsw-alias-label-secondary, #666);\n  font: inherit;\n  font-size: 11px;\n  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;\n  line-height: 24px;\n  cursor: pointer;\n  user-select: none;\n  white-space: nowrap;\n  transition: all 120ms ease;\n}\n\n.dshpp-btn:hover {\n  background: var(--dsw-alias-interactive-bg-hover, rgba(128, 128, 128, 0.12));\n  color: var(--dsw-alias-label-primary, #111);\n  border-color: var(--dsw-alias-brand-primary, #2563eb);\n}\n\n.dshpp-btn.is-ready {\n  background: rgba(37, 99, 235, 0.08);\n  border-color: rgba(37, 99, 235, 0.35);\n  color: var(--dsw-alias-brand-primary, #2563eb);\n}\n\n.dshpp-btn kbd {\n  margin: 0 1px;\n  padding: 1px 4px;\n  border: 1px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, 0.25));\n  border-radius: 4px;\n  font: inherit;\n  font-size: 10px;\n  background: var(--dsw-alias-bg-layer-1, rgba(255, 255, 255, 0.2));\n}\n\n.dshpp-btn-icon {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  flex-shrink: 0;\n}\n\n.dshpp-toast {\n  position: fixed;\n  right: 20px;\n  bottom: 84px;\n  max-width: 420px;\n  padding: 8px 14px;\n  border-radius: 8px;\n  background: var(--dsw-alias-bg-layer-3, #1e293b);\n  color: var(--dsw-alias-label-primary, #f8fafc);\n  font-size: 12px;\n  line-height: 18px;\n  pointer-events: none;\n  box-shadow: var(--dsw-shadow-lv3, 0 10px 15px -3px rgba(0, 0, 0, 0.3));\n  z-index: 1000;\n  animation: dshppFadeIn 150ms ease;\n  word-break: break-all;\n}\n\n.dshpp-toast.is-error {\n  background: #dc2626;\n  color: #ffffff;\n}\n\n.dshpp-drop-overlay {\n  position: fixed;\n  inset: 0;\n  z-index: 999;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  background: rgba(15, 23, 42, 0.65);\n  backdrop-filter: blur(4px);\n  pointer-events: none;\n  animation: dshppFadeIn 120ms ease;\n}\n\n.dshpp-drop-card {\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  gap: 12px;\n  padding: 24px 36px;\n  border-radius: 16px;\n  border: 2px dashed rgba(255, 255, 255, 0.4);\n  background: rgba(30, 41, 59, 0.85);\n  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);\n  color: #fff;\n  text-align: center;\n}\n\n.dshpp-drop-card-icon {\n  color: #60a5fa;\n}\n\n.dshpp-drop-card-title {\n  font-size: 16px;\n  font-weight: 600;\n}\n\n.dshpp-drop-card-desc {\n  font-size: 13px;\n  color: #94a3b8;\n}\n\n@keyframes dshppFadeIn {\n  from { opacity: 0; transform: scale(0.98); }\n  to { opacity: 1; transform: scale(1); }\n}\n"
+    const css = ".dshpp-btn {\n  appearance: none;\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  height: 24px;\n  padding: 0 8px;\n  border: 1px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, 0.2));\n  border-radius: 12px;\n  background: var(--dsw-alias-bg-layer-2, transparent);\n  color: var(--dsw-alias-label-secondary, #666);\n  font: inherit;\n  font-size: 11px;\n  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;\n  line-height: 24px;\n  cursor: pointer;\n  user-select: none;\n  white-space: nowrap;\n  transition: all 120ms ease;\n}\n\n.dshpp-btn:hover {\n  background: var(--dsw-alias-interactive-bg-hover, rgba(128, 128, 128, 0.12));\n  color: var(--dsw-alias-label-primary, #111);\n  border-color: var(--dsw-alias-brand-primary, #2563eb);\n}\n\n.dshpp-btn.is-ready {\n  background: rgba(37, 99, 235, 0.08);\n  border-color: rgba(37, 99, 235, 0.35);\n  color: var(--dsw-alias-brand-primary, #2563eb);\n}\n\n.dshpp-btn kbd {\n  margin: 0 1px;\n  padding: 1px 4px;\n  border: 1px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, 0.25));\n  border-radius: 4px;\n  font: inherit;\n  font-size: 10px;\n  background: var(--dsw-alias-bg-layer-1, rgba(255, 255, 255, 0.2));\n}\n\n.dshpp-btn-icon {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  flex-shrink: 0;\n}\n\n.dshpp-toast {\n  position: fixed;\n  right: 20px;\n  bottom: 84px;\n  max-width: 420px;\n  padding: 8px 14px;\n  border-radius: 8px;\n  background: var(--dsw-alias-bg-layer-3, #1e293b);\n  color: var(--dsw-alias-label-primary, #f8fafc);\n  font-size: 12px;\n  line-height: 18px;\n  pointer-events: none;\n  box-shadow: var(--dsw-shadow-lv3, 0 10px 15px -3px rgba(0, 0, 0, 0.3));\n  z-index: 1000;\n  animation: dshppFadeIn 150ms ease;\n  word-break: break-all;\n}\n\n.dshpp-toast.is-error {\n  background: #dc2626;\n  color: #ffffff;\n}\n\n.dshpp-drop-overlay {\n  position: fixed;\n  inset: 0;\n  z-index: 999;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  background: rgba(15, 23, 42, 0.65);\n  backdrop-filter: blur(4px);\n  pointer-events: none;\n  animation: dshppFadeIn 120ms ease;\n}\n\n.dshpp-drop-card {\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  gap: 12px;\n  padding: 24px 36px;\n  border-radius: 16px;\n  border: 2px dashed rgba(255, 255, 255, 0.4);\n  background: rgba(30, 41, 59, 0.85);\n  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);\n  color: #fff;\n  text-align: center;\n}\n\n.dshpp-drop-card-icon {\n  color: #60a5fa;\n}\n\n.dshpp-drop-card-title {\n  font-size: 16px;\n  font-weight: 600;\n}\n\n.dshpp-drop-card-desc {\n  font-size: 13px;\n  color: #94a3b8;\n}\n\n@keyframes dshppFadeIn {\n  from { opacity: 0; transform: scale(0.98); }\n  to { opacity: 1; transform: scale(1); }\n}\n\n/* 彻底压制原生限制图片的蒙层，防止全屏卡死 */\nbody[data-dshpp-drag=\"true\"] div[role=\"status\"]:has(> div[class*=\"illustration\"]),\nbody[data-dshpp-drag=\"true\"] div[class*=\"_mask\"]:has(div[class*=\"_illustration\"]),\nbody[data-dshpp-drag=\"true\"] div[class*=\"BInVoG_mask\"] {\n  display: none !important;\n  opacity: 0 !important;\n  pointer-events: none !important;\n}\n"
     if (typeof document !== 'undefined') {
       const id = 'dsh-paste-path/ui.css'
       let tag = document.querySelector('style[data-plugin-css=' + JSON.stringify(id) + ']')
@@ -100,12 +100,32 @@ function applyPeek(ready) {
 function setDragActive(active) {
   if (dragActiveState === active) return
   dragActiveState = active
+  if (typeof document !== 'undefined' && document.body) {
+    if (active) document.body.setAttribute('data-dshpp-drag', 'true')
+    else document.body.removeAttribute('data-dshpp-drag')
+  }
   emit(dragListeners)
 }
 
 function resetDrag() {
   dragDepth = 0
   setDragActive(false)
+  if (typeof window !== 'undefined') {
+    try {
+      window.dispatchEvent(new Event('dragend'))
+      window.dispatchEvent(new DragEvent('dragend'))
+    } catch {}
+  }
+  if (typeof document !== 'undefined') {
+    try {
+      const masks = document.querySelectorAll('div[role="status"]')
+      for (const el of masks) {
+        if (el.textContent && el.textContent.includes('图片拖动到此处')) {
+          el.style.display = 'none'
+        }
+      }
+    } catch {}
+  }
 }
 
 async function requestJson(url, options = {}) {
@@ -281,6 +301,8 @@ function onGlobalDragEnter(e) {
     return
   }
   e.preventDefault()
+  if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation()
+  else e.stopPropagation()
   dragDepth += 1
   setDragActive(true)
 }
@@ -291,6 +313,8 @@ function onGlobalDragOver(e) {
     return
   }
   e.preventDefault()
+  if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation()
+  else e.stopPropagation()
   e.dataTransfer.dropEffect = 'copy'
 }
 
@@ -299,6 +323,9 @@ function onGlobalDragLeave(e) {
   if (isTransferPureImages(e.dataTransfer)) {
     return
   }
+  e.preventDefault()
+  if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation()
+  else e.stopPropagation()
   dragDepth = Math.max(0, dragDepth - 1)
   if (dragDepth === 0) {
     setDragActive(false)
@@ -367,6 +394,7 @@ function onGlobalKeyDown(e) {
 }
 
 function onGlobalPaste(e) {
+  if (e.__dshpp_synthetic) return
   const cd = e.clipboardData
   if (!cd) return
   const items = Array.from(cd.items || [])

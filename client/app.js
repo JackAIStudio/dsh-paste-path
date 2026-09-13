@@ -84,12 +84,32 @@ function applyPeek(ready) {
 function setDragActive(active) {
   if (dragActiveState === active) return
   dragActiveState = active
+  if (typeof document !== 'undefined' && document.body) {
+    if (active) document.body.setAttribute('data-dshpp-drag', 'true')
+    else document.body.removeAttribute('data-dshpp-drag')
+  }
   emit(dragListeners)
 }
 
 function resetDrag() {
   dragDepth = 0
   setDragActive(false)
+  if (typeof window !== 'undefined') {
+    try {
+      window.dispatchEvent(new Event('dragend'))
+      window.dispatchEvent(new DragEvent('dragend'))
+    } catch {}
+  }
+  if (typeof document !== 'undefined') {
+    try {
+      const masks = document.querySelectorAll('div[role="status"]')
+      for (const el of masks) {
+        if (el.textContent && el.textContent.includes('图片拖动到此处')) {
+          el.style.display = 'none'
+        }
+      }
+    } catch {}
+  }
 }
 
 async function requestJson(url, options = {}) {
@@ -265,6 +285,8 @@ function onGlobalDragEnter(e) {
     return
   }
   e.preventDefault()
+  if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation()
+  else e.stopPropagation()
   dragDepth += 1
   setDragActive(true)
 }
@@ -275,6 +297,8 @@ function onGlobalDragOver(e) {
     return
   }
   e.preventDefault()
+  if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation()
+  else e.stopPropagation()
   e.dataTransfer.dropEffect = 'copy'
 }
 
@@ -283,6 +307,9 @@ function onGlobalDragLeave(e) {
   if (isTransferPureImages(e.dataTransfer)) {
     return
   }
+  e.preventDefault()
+  if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation()
+  else e.stopPropagation()
   dragDepth = Math.max(0, dragDepth - 1)
   if (dragDepth === 0) {
     setDragActive(false)
@@ -351,6 +378,7 @@ function onGlobalKeyDown(e) {
 }
 
 function onGlobalPaste(e) {
+  if (e.__dshpp_synthetic) return
   const cd = e.clipboardData
   if (!cd) return
   const items = Array.from(cd.items || [])

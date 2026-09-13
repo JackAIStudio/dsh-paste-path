@@ -116,3 +116,12 @@
   from { opacity: 0; transform: scale(0.98); }
   to { opacity: 1; transform: scale(1); }
 }
+
+/* 彻底压制原生限制图片的蒙层，防止全屏卡死 */
+body[data-dshpp-drag="true"] div[role="status"]:has(> div[class*="illustration"]),
+body[data-dshpp-drag="true"] div[class*="_mask"]:has(div[class*="_illustration"]),
+body[data-dshpp-drag="true"] div[class*="BInVoG_mask"] {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
