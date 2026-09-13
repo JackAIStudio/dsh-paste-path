@@ -19,13 +19,49 @@ const PEEK_ROUTE = '/dsh-paste-path/peek'
 const PASTE_ROUTE = '/dsh-paste-path/paste'
 const DROP_ROUTE = '/dsh-paste-path/resolve-drop'
 
-const IMAGE_TYPES = new Set([
+const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'svg'])
+const IMAGE_MIME_TYPES = new Set([
   'image/png',
   'image/jpeg',
   'image/jpg',
   'image/webp',
   'image/gif',
+  'image/bmp',
+  'image/svg+xml',
 ])
+
+function isImageFile(name, type) {
+  if (type && IMAGE_MIME_TYPES.has(type.toLowerCase())) return true
+  if (name && typeof name === 'string') {
+    const parts = name.split('.')
+    if (parts.length > 1) {
+      const ext = parts.pop().toLowerCase()
+      if (IMAGE_EXTENSIONS.has(ext)) return true
+    }
+  }
+  return false
+}
+
+function isTransferPureImages(dataTransfer) {
+  if (!dataTransfer) return false
+  if (dataTransfer.items && dataTransfer.items.length > 0) {
+    let hasFiles = false
+    for (let i = 0; i < dataTransfer.items.length; i++) {
+      const item = dataTransfer.items[i]
+      if (item.kind === 'file') {
+        hasFiles = true
+        if (!item.type || !IMAGE_MIME_TYPES.has(item.type.toLowerCase())) {
+          return false
+        }
+      }
+    }
+    return hasFiles
+  }
+  if (dataTransfer.files && dataTransfer.files.length > 0) {
+    return Array.from(dataTransfer.files).every(f => isImageFile(f.name, f.type))
+  }
+  return false
+}
 
 let toastState = null
 const toastListeners = new Set()
@@ -36,6 +72,10 @@ const peekListeners = new Set()
 let peekInFlight = false
 let remoteDisabled = false
 let stopPeekHook = null
+
+let dragActiveState = false
+const dragListeners = new Set()
+let dragDepth = 0
 
 function emit(listeners) {
   for (const fn of listeners) fn()
@@ -57,6 +97,17 @@ function applyPeek(ready) {
   emit(peekListeners)
 }
 
+function setDragActive(active) {
+  if (dragActiveState === active) return
+  dragActiveState = active
+  emit(dragListeners)
+}
+
+function resetDrag() {
+  dragDepth = 0
+  setDragActive(false)
+}
+
 async function requestJson(url, options = {}) {
   const res = await fetch(url, {
     ...options,
@@ -69,12 +120,12 @@ async function requestJson(url, options = {}) {
   try {
     data = await res.json()
   } catch {
-    const err = new Error(`HTTP ${res.status}`)
+    const err = new Error('HTTP ' + res.status)
     err.status = res.status
     throw err
   }
   if (!res.ok) {
-    const err = new Error(data && data.error ? data.error : `HTTP ${res.status}`)
+    const err = new Error(data && data.error ? data.error : 'HTTP ' + res.status)
     err.status = res.status
     if (data && data.code) err.code = data.code
     throw err
@@ -103,9 +154,11 @@ function refreshPeek() {
 
 function findComposerElement() {
   return (
+    document.querySelector('div[data-composer-input="true"][role="textbox"]') ||
     document.querySelector('[data-composer-input="true"]') ||
     document.querySelector('div[role="textbox"][contenteditable="true"]') ||
-    document.querySelector('textarea[data-composer-input="true"]')
+    document.querySelector('textarea[data-composer-input="true"]') ||
+    document.querySelector('textarea')
   )
 }
 
@@ -117,17 +170,26 @@ function insertPathsToComposer(paths) {
     return 0
   }
 
-  // Focus the input
-  if (document.activeElement !== composer) {
-    composer.focus()
-  }
+  // Focus input
+  composer.focus()
 
   const cleanPaths = paths.map((p) => String(p || '').trim()).filter(Boolean)
   if (cleanPaths.length === 0) return 0
 
-  const textToInsert = cleanPaths.join('\n')
+  const textToInsert = cleanPaths.join(String.fromCharCode(10))
 
-  // Use document.execCommand('insertText') for Lexical / contenteditable standard flow
+  // Move selection inside composer if needed
+  const sel = window.getSelection()
+  if (!sel || sel.rangeCount === 0 || !composer.contains(sel.anchorNode)) {
+    const range = document.createRange()
+    range.selectNodeContents(composer)
+    range.collapse(false)
+    if (sel) {
+      sel.removeAllRanges()
+      sel.addRange(range)
+    }
+  }
+
   let success = false
   try {
     if (document.queryCommandSupported && document.queryCommandSupported('insertText')) {
@@ -137,7 +199,6 @@ function insertPathsToComposer(paths) {
     success = false
   }
 
-  // Fallback via InputEvent dispatch
   if (!success) {
     try {
       const event = new InputEvent('beforeinput', {
@@ -153,11 +214,31 @@ function insertPathsToComposer(paths) {
     }
   }
 
+  if (!success) {
+    try {
+      const activeSel = window.getSelection()
+      if (activeSel && activeSel.rangeCount > 0) {
+        const range = activeSel.getRangeAt(0)
+        range.deleteContents()
+        const textNode = document.createTextNode(textToInsert)
+        range.insertNode(textNode)
+        range.setStartAfter(textNode)
+        range.setEndAfter(textNode)
+        activeSel.removeAllRanges()
+        activeSel.addRange(range)
+        composer.dispatchEvent(new Event('input', { bubbles: true }))
+        success = true
+      }
+    } catch {
+      success = false
+    }
+  }
+
   if (success) {
     if (cleanPaths.length === 1) {
-      showToast(`已插入 ${cleanPaths[0]}`)
+      showToast('已插入 ' + cleanPaths[0])
     } else {
-      showToast(`已插入 ${cleanPaths.length} 个路径`)
+      showToast('已插入 ' + cleanPaths.length + ' 个路径')
     }
     return cleanPaths.length
   } else {
@@ -176,7 +257,7 @@ function doPastePaths() {
       const paths = res && Array.isArray(res.paths) ? res.paths : []
       if (paths.length === 0) {
         applyPeek(false)
-        showToast(res && res.error ? res.error : '剪贴板里没有文件路径', true)
+        showToast(res && res.error ? res.error : '剪贴板里没有文件路径。请在访达中选中文件按 Cmd+C 后再试。', true)
         return
       }
       insertPathsToComposer(paths)
@@ -189,30 +270,118 @@ function doPastePaths() {
   )
 }
 
-function isFilesOnlyImages(dataTransfer) {
-  if (!dataTransfer) return false
-  if (dataTransfer.items && dataTransfer.items.length > 0) {
-    for (let i = 0; i < dataTransfer.items.length; i++) {
-      const item = dataTransfer.items[i]
-      if (item.kind === 'file') {
-        // If type is empty string, it could be a folder or non-standard extension
-        if (!item.type || !IMAGE_TYPES.has(item.type.toLowerCase())) {
-          return false
-        }
-      }
-    }
-    return true
+function hasDragFiles(e) {
+  const dt = e.dataTransfer
+  return Boolean(dt && dt.types && (dt.types.includes('Files') || dt.types.includes('public.file-url')))
+}
+
+function onGlobalDragEnter(e) {
+  if (!hasDragFiles(e)) return
+  if (isTransferPureImages(e.dataTransfer)) {
+    return
   }
-  if (dataTransfer.files && dataTransfer.files.length > 0) {
-    for (let i = 0; i < dataTransfer.files.length; i++) {
-      const file = dataTransfer.files[i]
-      if (!file.type || !IMAGE_TYPES.has(file.type.toLowerCase())) {
-        return false
-      }
-    }
-    return true
+  e.preventDefault()
+  dragDepth += 1
+  setDragActive(true)
+}
+
+function onGlobalDragOver(e) {
+  if (!hasDragFiles(e)) return
+  if (isTransferPureImages(e.dataTransfer)) {
+    return
   }
-  return false
+  e.preventDefault()
+  e.dataTransfer.dropEffect = 'copy'
+}
+
+function onGlobalDragLeave(e) {
+  if (!hasDragFiles(e)) return
+  if (isTransferPureImages(e.dataTransfer)) {
+    return
+  }
+  dragDepth = Math.max(0, dragDepth - 1)
+  if (dragDepth === 0) {
+    setDragActive(false)
+  }
+}
+
+async function onGlobalDrop(e) {
+  if (!hasDragFiles(e)) return
+  const files = Array.from(e.dataTransfer.files || [])
+  const isPureImages = files.length > 0 && files.every(f => isImageFile(f.name, f.type))
+  if (isPureImages) {
+    resetDrag()
+    return // Let native image attachment handler process pure images
+  }
+
+  // Prevent native Lexical / DSH attachments handler to avoid "仅支持 PNG、JPG、WebP、GIF 格式的图片"
+  e.preventDefault()
+  e.stopPropagation()
+  if (typeof e.stopImmediatePropagation === 'function') {
+    e.stopImmediatePropagation()
+  }
+  resetDrag()
+
+  const filePayload = files.map((f) => ({
+    name: f.name,
+    size: f.size,
+    type: f.type,
+  }))
+
+  if (filePayload.length === 0) {
+    filePayload.push({ name: '', size: 0, type: '' })
+  }
+
+  try {
+    const res = await requestJson(DROP_ROUTE, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ files: filePayload }),
+    })
+    const paths = res && Array.isArray(res.paths) ? res.paths : []
+    if (paths.length > 0) {
+      insertPathsToComposer(paths)
+    } else {
+      showToast('无法解析拖拽文件的绝对路径', true)
+    }
+  } catch (err) {
+    showToast(err && err.message ? err.message : '解析拖拽路径失败', true)
+  }
+}
+
+function onGlobalDragEnd() {
+  resetDrag()
+}
+
+function onGlobalKeyDown(e) {
+  if (!e || e.isComposing) return
+  // Ctrl + V
+  if (e.ctrlKey && !e.metaKey && !e.altKey) {
+    if (typeof e.key === 'string' && e.key.toLowerCase() === 'v') {
+      e.preventDefault()
+      if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation()
+      else e.stopPropagation()
+      doPastePaths()
+    }
+  }
+}
+
+function onGlobalPaste(e) {
+  const cd = e.clipboardData
+  if (!cd) return
+  const items = Array.from(cd.items || [])
+  const hasFiles = items.some(item => item.kind === 'file')
+  if (hasFiles) {
+    const files = Array.from(cd.files || [])
+    const isPureImages = files.length > 0 && files.every(f => isImageFile(f.name, f.type))
+    if (!isPureImages) {
+      // Non-image file in clipboard: intercept to avoid DSH unsupportedType error
+      e.preventDefault()
+      if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation()
+      else e.stopPropagation()
+      doPastePaths()
+    }
+  }
 }
 
 function PathButton() {
@@ -223,24 +392,6 @@ function PathButton() {
     peekListeners.add(listener)
     return () => {
       peekListeners.delete(listener)
-    }
-  }, [])
-
-  React.useEffect(() => {
-    const onKeyDown = (event) => {
-      if (!event || event.isComposing) return
-      // Ctrl+V (not Cmd+V)
-      if (event.ctrlKey && !event.metaKey && !event.altKey) {
-        if (typeof event.key === 'string' && event.key.toLowerCase() === 'v') {
-          event.preventDefault()
-          event.stopPropagation()
-          doPastePaths()
-        }
-      }
-    }
-    window.addEventListener('keydown', onKeyDown, true)
-    return () => {
-      window.removeEventListener('keydown', onKeyDown, true)
     }
   }, [])
 
@@ -255,7 +406,7 @@ function PathButton() {
     {
       type: 'button',
       className: ready ? 'dshpp-btn is-ready' : 'dshpp-btn',
-      title: '点击或按 Ctrl+V 插入剪贴板中的文件绝对路径',
+      title: '点击或按 Ctrl+V 插入访达剪贴板中的文件绝对路径',
       onClick,
     },
     React.createElement(
@@ -294,111 +445,17 @@ function PathButton() {
 }
 
 function DropOverlayContainer() {
-  const [dragActive, setDragActive] = React.useState(false)
+  const [dragActive, setLocalDragActive] = React.useState(dragActiveState)
   const [toast, setToast] = React.useState(toastState)
-  const dragDepth = React.useRef(0)
 
   React.useEffect(() => {
-    const listener = () => setToast(toastState)
-    toastListeners.add(listener)
+    const dragListener = () => setLocalDragActive(dragActiveState)
+    dragListeners.add(dragListener)
+    const toastListener = () => setToast(toastState)
+    toastListeners.add(toastListener)
     return () => {
-      toastListeners.delete(listener)
-    }
-  }, [])
-
-  React.useEffect(() => {
-    const hasFiles = (e) => {
-      const dt = e.dataTransfer
-      return Boolean(dt && dt.types && (dt.types.includes('Files') || dt.types.includes('public.file-url')))
-    }
-
-    const reset = () => {
-      dragDepth.current = 0
-      setDragActive(false)
-    }
-
-    const onDragEnter = (e) => {
-      if (!hasFiles(e)) return
-      // If it is ONLY images, let DSH native image attachment handle it
-      if (isFilesOnlyImages(e.dataTransfer)) {
-        return
-      }
-      e.preventDefault()
-      dragDepth.current += 1
-      setDragActive(true)
-    }
-
-    const onDragOver = (e) => {
-      if (!hasFiles(e)) return
-      if (isFilesOnlyImages(e.dataTransfer)) {
-        return
-      }
-      e.preventDefault()
-      e.dataTransfer.dropEffect = 'copy'
-    }
-
-    const onDragLeave = (e) => {
-      if (!hasFiles(e)) return
-      if (isFilesOnlyImages(e.dataTransfer)) {
-        return
-      }
-      dragDepth.current = Math.max(0, dragDepth.current - 1)
-      if (dragDepth.current === 0) {
-        setDragActive(false)
-      }
-    }
-
-    const onDrop = async (e) => {
-      if (!hasFiles(e)) return
-      if (isFilesOnlyImages(e.dataTransfer)) {
-        reset()
-        return // Leave for native handler
-      }
-      e.preventDefault()
-      e.stopPropagation()
-      reset()
-
-      const files = [...(e.dataTransfer.files || [])].map((f) => ({
-        name: f.name,
-        size: f.size,
-        type: f.type,
-      }))
-
-      if (files.length === 0) {
-        // Dragging a folder or special file where files array is empty in browser
-        // Send empty array to trigger Finder selection resolution
-        files.push({ name: '', size: 0, type: '' })
-      }
-
-      try {
-        const res = await requestJson(DROP_ROUTE, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ files }),
-        })
-        const paths = res && Array.isArray(res.paths) ? res.paths : []
-        if (paths.length > 0) {
-          insertPathsToComposer(paths)
-        } else {
-          showToast('无法解析被拖拽文件的绝对路径', true)
-        }
-      } catch (err) {
-        showToast(err && err.message ? err.message : '解析拖拽路径失败', true)
-      }
-    }
-
-    window.addEventListener('dragenter', onDragEnter, true)
-    window.addEventListener('dragover', onDragOver, true)
-    window.addEventListener('dragleave', onDragLeave, true)
-    window.addEventListener('drop', onDrop, true)
-    window.addEventListener('dragend', reset)
-
-    return () => {
-      window.removeEventListener('dragenter', onDragEnter, true)
-      window.removeEventListener('dragover', onDragOver, true)
-      window.removeEventListener('dragleave', onDragLeave, true)
-      window.removeEventListener('drop', onDrop, true)
-      window.removeEventListener('dragend', reset)
+      dragListeners.delete(dragListener)
+      toastListeners.delete(toastListener)
     }
   }, [])
 
@@ -453,8 +510,29 @@ function DropOverlayContainer() {
 }
 
 function apply(ctx) {
-  const slots = ctx.get('slots')
-  if (slots === undefined) return
+  const slots = ctx.slots || (typeof ctx.get === 'function' ? ctx.get('slots') : undefined)
+
+  // Attach global keyboard, paste, and drag/drop interceptors immediately
+  let removeGlobalListeners = () => {}
+  if (typeof window !== 'undefined') {
+    window.addEventListener('keydown', onGlobalKeyDown, true)
+    window.addEventListener('paste', onGlobalPaste, true)
+    window.addEventListener('dragenter', onGlobalDragEnter, true)
+    window.addEventListener('dragover', onGlobalDragOver, true)
+    window.addEventListener('dragleave', onGlobalDragLeave, true)
+    window.addEventListener('drop', onGlobalDrop, true)
+    window.addEventListener('dragend', onGlobalDragEnd)
+
+    removeGlobalListeners = () => {
+      window.removeEventListener('keydown', onGlobalKeyDown, true)
+      window.removeEventListener('paste', onGlobalPaste, true)
+      window.removeEventListener('dragenter', onGlobalDragEnter, true)
+      window.removeEventListener('dragover', onGlobalDragOver, true)
+      window.removeEventListener('dragleave', onGlobalDragLeave, true)
+      window.removeEventListener('drop', onGlobalDrop, true)
+      window.removeEventListener('dragend', onGlobalDragEnd)
+    }
+  }
 
   let peekTimer = null
   const startPeek = () => {
@@ -481,36 +559,43 @@ function apply(ctx) {
     window.addEventListener('focus', refreshPeek)
   }
 
-  ctx.effect(() => () => {
-    if (stopPeekHook === stopPeek) stopPeekHook = null
-    stopPeek()
-    if (typeof document !== 'undefined') {
-      document.removeEventListener('visibilitychange', onVisibility)
-      window.removeEventListener('focus', refreshPeek)
-    }
-    if (toastTimer !== null) clearTimeout(toastTimer)
-    toastListeners.clear()
-    peekListeners.clear()
-  })
+  if (typeof ctx.effect === 'function') {
+    ctx.effect(() => () => {
+      if (stopPeekHook === stopPeek) stopPeekHook = null
+      stopPeek()
+      removeGlobalListeners()
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibility)
+        window.removeEventListener('focus', refreshPeek)
+      }
+      if (toastTimer !== null) clearTimeout(toastTimer)
+      toastListeners.clear()
+      peekListeners.clear()
+      dragListeners.clear()
+    })
+  }
 
-  // Register Button in composer input left tool row
-  slots.inject('conversation.input.left', () =>
-    slots.register(
-      { name: 'conversation.input.left', id: 'dsh-paste-path', order: 30, label: '贴路径' },
-      () => React.createElement(PathButton, null)
+  if (slots && typeof slots.inject === 'function') {
+    // Register Button in composer input left tool row
+    slots.inject('conversation.input.left', () =>
+      slots.register(
+        { name: 'conversation.input.left', id: 'dsh-paste-path', order: 30, label: '贴路径' },
+        () => React.createElement(PathButton, null)
+      )
     )
-  )
 
-  // Register Global Drop Overlay & Toast in shell overlay
-  slots.inject('shell.overlay', () =>
-    slots.register(
-      { name: 'shell.overlay', id: 'dsh-paste-path-overlay', order: 90, label: '拖拽路径与提示' },
-      () => React.createElement(DropOverlayContainer, null)
+    // Register Global Drop Overlay & Toast in shell overlay
+    slots.inject('shell.overlay', () =>
+      slots.register(
+        { name: 'shell.overlay', id: 'dsh-paste-path-overlay', order: 90, label: '拖拽路径与提示' },
+        () => React.createElement(DropOverlayContainer, null)
+      )
     )
-  )
+  }
 }
 
 module.exports = { name: 'dsh-paste-path', apply }
+module.exports.inject = ['slots']
 
     return module.exports
   },
