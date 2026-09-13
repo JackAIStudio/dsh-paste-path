@@ -418,12 +418,17 @@ function PathButton() {
     doPastePaths()
   }
 
+  const onMouseDown = (e) => {
+    e.preventDefault()
+  }
+
   return React.createElement(
     "button",
     {
       type: "button",
       className: ready ? "dshpp-btn is-ready" : "dshpp-btn",
       title: "点击或按 Ctrl+V / Cmd+V 粘贴访达中选中的文件路径",
+      onMouseDown,
       onClick,
     },
     React.createElement(
