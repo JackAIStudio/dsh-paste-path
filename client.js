@@ -14,26 +14,26 @@ window.__ModuleLoader__.load({
       }
       tag.textContent = css
     }
-const React = require('react')
-const PEEK_ROUTE = '/dsh-paste-path/peek'
-const PASTE_ROUTE = '/dsh-paste-path/paste'
-const DROP_ROUTE = '/dsh-paste-path/resolve-drop'
+const React = require("react")
+const PEEK_ROUTE = "/dsh-paste-path/peek"
+const PASTE_ROUTE = "/dsh-paste-path/paste"
+const DROP_ROUTE = "/dsh-paste-path/resolve-drop"
 
-const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'svg'])
+const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp", "gif", "bmp", "svg"])
 const IMAGE_MIME_TYPES = new Set([
-  'image/png',
-  'image/jpeg',
-  'image/jpg',
-  'image/webp',
-  'image/gif',
-  'image/bmp',
-  'image/svg+xml',
+  "image/png",
+  "image/jpeg",
+  "image/jpg",
+  "image/webp",
+  "image/gif",
+  "image/bmp",
+  "image/svg+xml",
 ])
 
 function isImageFile(name, type) {
   if (type && IMAGE_MIME_TYPES.has(type.toLowerCase())) return true
-  if (name && typeof name === 'string') {
-    const parts = name.split('.')
+  if (name && typeof name === "string") {
+    const parts = name.split(".")
     if (parts.length > 1) {
       const ext = parts.pop().toLowerCase()
       if (IMAGE_EXTENSIONS.has(ext)) return true
@@ -48,7 +48,7 @@ function isTransferPureImages(dataTransfer) {
     let hasFiles = false
     for (let i = 0; i < dataTransfer.items.length; i++) {
       const item = dataTransfer.items[i]
-      if (item.kind === 'file') {
+      if (item.kind === "file") {
         hasFiles = true
         if (!item.type || !IMAGE_MIME_TYPES.has(item.type.toLowerCase())) {
           return false
@@ -73,8 +73,6 @@ let peekInFlight = false
 let remoteDisabled = false
 let stopPeekHook = null
 
-let dragActiveState = false
-const dragListeners = new Set()
 let dragDepth = 0
 
 function emit(listeners) {
@@ -97,13 +95,12 @@ function applyPeek(ready) {
   emit(peekListeners)
 }
 
-function setDragActive(active) {
-  if (typeof document !== 'undefined') {
-    const card = document.querySelector('[data-composer-card]') || document.querySelector('div[data-composer-input="true"]')
-    if (card) {
-      if (active) card.classList.add('dshpp-drag-over')
-      else card.classList.remove('dshpp-drag-over')
-    }
+function setHighlightInput(active) {
+  if (typeof document === "undefined") return
+  const card = document.querySelector("[data-composer-card]") || document.querySelector("div[data-composer-input]")
+  if (card) {
+    if (active) card.classList.add("dshpp-drag-over")
+    else card.classList.remove("dshpp-drag-over")
   }
 }
 
@@ -113,7 +110,7 @@ function resetDrag() {
   inResetDrag = true
   try {
     dragDepth = 0
-    setDragActive(false)
+    setHighlightInput(false)
   } finally {
     inResetDrag = false
   }
@@ -123,7 +120,7 @@ async function requestJson(url, options = {}) {
   const res = await fetch(url, {
     ...options,
     headers: {
-      accept: 'application/json',
+      accept: "application/json",
       ...(options.headers || {}),
     },
   })
@@ -131,12 +128,12 @@ async function requestJson(url, options = {}) {
   try {
     data = await res.json()
   } catch {
-    const err = new Error('HTTP ' + res.status)
+    const err = new Error("HTTP " + res.status)
     err.status = res.status
     throw err
   }
   if (!res.ok) {
-    const err = new Error(data && data.error ? data.error : 'HTTP ' + res.status)
+    const err = new Error(data && data.error ? data.error : "HTTP " + res.status)
     err.status = res.status
     if (data && data.code) err.code = data.code
     throw err
@@ -147,14 +144,14 @@ async function requestJson(url, options = {}) {
 function refreshPeek() {
   if (peekInFlight || remoteDisabled) return
   peekInFlight = true
-  requestJson(PEEK_ROUTE, { method: 'GET' }).then(
+  requestJson(PEEK_ROUTE, { method: "GET" }).then(
     (res) => {
       peekInFlight = false
       applyPeek(Boolean(res && res.ready))
     },
     (err) => {
       peekInFlight = false
-      if (err && (err.code === 'remote-not-supported' || err.status === 403)) {
+      if (err && (err.code === "remote-not-supported" || err.status === 403)) {
         remoteDisabled = true
         applyPeek(false)
         if (stopPeekHook !== null) stopPeekHook()
@@ -165,11 +162,11 @@ function refreshPeek() {
 
 function findComposerElement() {
   return (
-    document.querySelector('div[data-composer-input="true"][role="textbox"]') ||
-    document.querySelector('[data-composer-input="true"]') ||
-    document.querySelector('div[role="textbox"][contenteditable="true"]') ||
-    document.querySelector('textarea[data-composer-input="true"]') ||
-    document.querySelector('textarea')
+    document.querySelector("div[data-composer-input]") ||
+    document.querySelector("[data-composer-input]") ||
+    document.querySelector("div[contenteditable]") ||
+    document.querySelector("textarea[data-composer-input]") ||
+    document.querySelector("textarea")
   )
 }
 
@@ -177,14 +174,14 @@ function insertPathsToComposer(paths) {
   if (!paths || paths.length === 0) return 0
   const composer = findComposerElement()
   if (!composer) {
-    showToast('未找到活动输入框', true)
+    showToast("未找到活动输入框", true)
     return 0
   }
 
   // 1. Focus input
   composer.focus()
 
-  const cleanPaths = paths.map((p) => String(p || '').trim()).filter(Boolean)
+  const cleanPaths = paths.map((p) => String(p || "").trim()).filter(Boolean)
   if (cleanPaths.length === 0) return 0
 
   // 2. Ensure cursor is in composer
@@ -199,51 +196,38 @@ function insertPathsToComposer(paths) {
     }
   }
 
-  let success = false
-  const editor = composer.__lexicalEditor
+  const firstPath = cleanPaths[0]
 
-  // 3. Primary Method: Native Lexical Command Dispatch (Guaranteed True LineBreak in Lexical State)
-  if (editor && typeof editor.dispatchCommand === 'function') {
-    try {
-      const textCmd = { type: 'CONTROLLED_TEXT_INSERTION_COMMAND' }
-      const breakCmd = { type: 'INSERT_LINE_BREAK_COMMAND' }
-      for (let i = 0; i < cleanPaths.length; i++) {
-        editor.dispatchCommand(textCmd, cleanPaths[i])
-        if (i < cleanPaths.length - 1) {
-          editor.dispatchCommand(breakCmd, false)
-        }
-      }
-      success = true
-    } catch {
-      success = false
-    }
-  }
+  // 策略 1: 尝试标准 insertHTML (带 <br> 换行)
+  try {
+    const html = cleanPaths.join("<br>") + "<br>"
+    document.execCommand("insertHTML", false, html)
+  } catch {}
 
-  // 4. Fallback: InputEvent with insertText & insertLineBreak
+  let success = (composer.innerText || "").includes(firstPath)
+
+  // 策略 2: 逐行 execCommand("insertText") + Shift+Enter 换行
   if (!success) {
     try {
       for (let i = 0; i < cleanPaths.length; i++) {
-        composer.dispatchEvent(new InputEvent('beforeinput', {
-          bubbles: true,
-          cancelable: true,
-          inputType: 'insertText',
-          data: cleanPaths[i],
-        }))
+        document.execCommand("insertText", false, cleanPaths[i]);
         if (i < cleanPaths.length - 1) {
-          composer.dispatchEvent(new InputEvent('beforeinput', {
+          composer.dispatchEvent(new KeyboardEvent("keydown", {
+            key: "Enter",
+            code: "Enter",
+            keyCode: 13,
+            which: 13,
+            shiftKey: true,
             bubbles: true,
             cancelable: true,
-            inputType: 'insertLineBreak',
           }))
         }
       }
-      success = true
-    } catch {
-      success = false
-    }
+    } catch {}
+    success = (composer.innerText || "").includes(firstPath)
   }
 
-  // 5. Fallback: Range insertion with DocumentFragment and <br> elements
+  // 策略 3: Range 插入 DocumentFragment (<br> 分隔)
   if (!success) {
     try {
       const activeSel = window.getSelection()
@@ -254,28 +238,39 @@ function insertPathsToComposer(paths) {
         for (let i = 0; i < cleanPaths.length; i++) {
           fragment.appendChild(document.createTextNode(cleanPaths[i]))
           if (i < cleanPaths.length - 1) {
-            fragment.appendChild(document.createElement('br'))
+            fragment.appendChild(document.createElement("br"))
           }
         }
         range.insertNode(fragment)
         range.collapse(false)
-        composer.dispatchEvent(new Event('input', { bubbles: true }))
-        success = true
+        activeSel.removeAllRanges()
+        activeSel.addRange(range)
+        composer.dispatchEvent(new Event("input", { bubbles: true }))
       }
-    } catch {
-      success = false
-    }
+    } catch {}
+    success = (composer.innerText || "").includes(firstPath)
+  }
+
+  // 策略 4: 基础 insertText 兜底
+  if (!success) {
+    try {
+      for (let i = 0; i < cleanPaths.length; i++) {
+        document.execCommand("insertText", false, cleanPaths[i]);
+
+      }
+    } catch {}
+    success = (composer.innerText || "").includes(firstPath)
   }
 
   if (success) {
     if (cleanPaths.length === 1) {
-      showToast('已插入 ' + cleanPaths[0])
+      showToast("已插入 " + cleanPaths[0])
     } else {
-      showToast('已插入 ' + cleanPaths.length + ' 个路径')
+      showToast("已插入 " + cleanPaths.length + " 个路径")
     }
     return cleanPaths.length
   } else {
-    showToast('写入输入框失败', true)
+    showToast("写入输入框失败", true)
     return 0
   }
 }
@@ -284,13 +279,13 @@ let pasteInFlight = false
 function doPastePaths() {
   if (pasteInFlight) return
   pasteInFlight = true
-  requestJson(PASTE_ROUTE, { method: 'POST' }).then(
+  requestJson(PASTE_ROUTE, { method: "POST" }).then(
     (res) => {
       pasteInFlight = false
       const paths = res && Array.isArray(res.paths) ? res.paths : []
       if (paths.length === 0) {
         applyPeek(false)
-        showToast(res && res.error ? res.error : '剪贴板里没有文件路径。请在访达中选中文件按 Cmd+C 后再试。', true)
+        showToast(res && res.error ? res.error : "剪贴板里没有文件路径。请在访达中选中文件按 Cmd+C 后再试。", true)
         return
       }
       insertPathsToComposer(paths)
@@ -298,14 +293,14 @@ function doPastePaths() {
     },
     (err) => {
       pasteInFlight = false
-      showToast(err && err.message ? err.message : '读取剪贴板路径失败', true)
+      showToast(err && err.message ? err.message : "读取剪贴板路径失败", true)
     }
   )
 }
 
 function hasDragFiles(e) {
   const dt = e.dataTransfer
-  return Boolean(dt && dt.types && (dt.types.includes('Files') || dt.types.includes('public.file-url')))
+  return Boolean(dt && dt.types && (dt.types.includes("Files") || dt.types.includes("public.file-url")))
 }
 
 function onGlobalDragEnter(e) {
@@ -314,10 +309,10 @@ function onGlobalDragEnter(e) {
     return
   }
   e.preventDefault()
-  if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation()
+  if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation()
   else e.stopPropagation()
   dragDepth += 1
-  setDragActive(true)
+  setHighlightInput(true)
 }
 
 function onGlobalDragOver(e) {
@@ -326,9 +321,10 @@ function onGlobalDragOver(e) {
     return
   }
   e.preventDefault()
-  if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation()
+  if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation()
   else e.stopPropagation()
-  e.dataTransfer.dropEffect = 'copy'
+  e.dataTransfer.dropEffect = "copy"
+  setHighlightInput(true)
 }
 
 function onGlobalDragLeave(e) {
@@ -337,11 +333,11 @@ function onGlobalDragLeave(e) {
     return
   }
   e.preventDefault()
-  if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation()
+  if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation()
   else e.stopPropagation()
   dragDepth = Math.max(0, dragDepth - 1)
   if (dragDepth === 0) {
-    setDragActive(false)
+    setHighlightInput(false)
   }
 }
 
@@ -351,16 +347,35 @@ async function onGlobalDrop(e) {
   const isPureImages = files.length > 0 && files.every(f => isImageFile(f.name, f.type))
   if (isPureImages) {
     resetDrag()
-    return // Let native image attachment handler process pure images
+    return
   }
 
-  // Prevent native Lexical / DSH attachments handler to avoid "仅支持 PNG、JPG、WebP、GIF 格式的图片"
+  // Prevent native DSH attachments handler to avoid unsupportedType error
   e.preventDefault()
-  e.stopPropagation()
-  if (typeof e.stopImmediatePropagation === 'function') {
+  if (typeof e.stopImmediatePropagation === "function") {
     e.stopImmediatePropagation()
+  } else {
+    e.stopPropagation()
   }
   resetDrag()
+
+  // Try direct URI list if available
+  let directPaths = []
+  try {
+    const uriList = e.dataTransfer.getData("text/uri-list") || ""
+    if (uriList) {
+      const parsed = uriList.split(/[\r\n]+/)
+        .map(u => u.trim())
+        .filter(u => u.startsWith("file://"))
+        .map(u => decodeURIComponent(u.replace(/^file:\/\//, "")))
+      if (parsed.length > 0) directPaths = parsed
+    }
+  } catch {}
+
+  if (directPaths.length > 0) {
+    insertPathsToComposer(directPaths)
+    return
+  }
 
   const filePayload = files.map((f) => ({
     name: f.name,
@@ -369,23 +384,23 @@ async function onGlobalDrop(e) {
   }))
 
   if (filePayload.length === 0) {
-    filePayload.push({ name: '', size: 0, type: '' })
+    filePayload.push({ name: "", size: 0, type: "" })
   }
 
   try {
     const res = await requestJson(DROP_ROUTE, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      method: "POST",
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({ files: filePayload }),
     })
     const paths = res && Array.isArray(res.paths) ? res.paths : []
     if (paths.length > 0) {
       insertPathsToComposer(paths)
     } else {
-      showToast('无法解析拖拽文件的绝对路径', true)
+      showToast("无法解析拖拽文件的绝对路径", true)
     }
   } catch (err) {
-    showToast(err && err.message ? err.message : '解析拖拽路径失败', true)
+    showToast(err && err.message ? err.message : "解析拖拽路径失败", true)
   }
 }
 
@@ -397,9 +412,9 @@ function onGlobalKeyDown(e) {
   if (!e || e.isComposing) return
   // Ctrl + V
   if (e.ctrlKey && !e.metaKey && !e.altKey) {
-    if (typeof e.key === 'string' && e.key.toLowerCase() === 'v') {
+    if (typeof e.key === "string" && e.key.toLowerCase() === "v") {
       e.preventDefault()
-      if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation()
+      if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation()
       else e.stopPropagation()
       doPastePaths()
     }
@@ -407,18 +422,16 @@ function onGlobalKeyDown(e) {
 }
 
 function onGlobalPaste(e) {
-  if (e.__dshpp_synthetic) return
   const cd = e.clipboardData
   if (!cd) return
   const items = Array.from(cd.items || [])
-  const hasFiles = items.some(item => item.kind === 'file')
+  const hasFiles = items.some(item => item.kind === "file")
   if (hasFiles) {
     const files = Array.from(cd.files || [])
     const isPureImages = files.length > 0 && files.every(f => isImageFile(f.name, f.type))
     if (!isPureImages) {
-      // Non-image file in clipboard: intercept to avoid DSH unsupportedType error
       e.preventDefault()
-      if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation()
+      if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation()
       else e.stopPropagation()
       doPastePaths()
     }
@@ -443,43 +456,43 @@ function PathButton() {
   }
 
   return React.createElement(
-    'button',
+    "button",
     {
-      type: 'button',
-      className: ready ? 'dshpp-btn is-ready' : 'dshpp-btn',
-      title: '点击或按 Ctrl+V / Cmd+V 粘贴访达中选中的文件路径',
+      type: "button",
+      className: ready ? "dshpp-btn is-ready" : "dshpp-btn",
+      title: "点击或按 Ctrl+V / Cmd+V 粘贴访达中选中的文件路径",
       onClick,
     },
     React.createElement(
-      'span',
-      { className: 'dshpp-btn-icon' },
+      "span",
+      { className: "dshpp-btn-icon" },
       React.createElement(
-        'svg',
+        "svg",
         {
-          width: '14',
-          height: '14',
-          viewBox: '0 0 24 24',
-          fill: 'none',
-          stroke: 'currentColor',
-          strokeWidth: '2',
-          strokeLinecap: 'round',
-          strokeLinejoin: 'round',
+          width: "14",
+          height: "14",
+          viewBox: "0 0 24 24",
+          fill: "none",
+          stroke: "currentColor",
+          strokeWidth: "2",
+          strokeLinecap: "round",
+          strokeLinejoin: "round",
         },
-        React.createElement('path', {
-          d: 'M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2',
+        React.createElement("path", {
+          d: "M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2",
         }),
-        React.createElement('rect', {
-          x: '8',
-          y: '2',
-          width: '8',
-          height: '4',
-          rx: '1',
-          ry: '1',
+        React.createElement("rect", {
+          x: "8",
+          y: "2",
+          width: "8",
+          height: "4",
+          rx: "1",
+          ry: "1",
         })
       )
     ),
-    React.createElement('span', { className: 'dshpp-btn-text' }, '贴路径'),
-    React.createElement('span', { className: 'dshpp-btn-shortcut' }, '⌃V')
+    React.createElement("span", { className: "dshpp-btn-text" }, "贴路径"),
+    React.createElement("span", { className: "dshpp-btn-shortcut" }, "⌃V")
   )
 }
 
@@ -496,35 +509,34 @@ function ToastOverlay() {
 
   return toast !== null
     ? React.createElement(
-        'div',
-        { className: toast.isError ? 'dshpp-toast is-error' : 'dshpp-toast' },
+        "div",
+        { className: toast.isError ? "dshpp-toast is-error" : "dshpp-toast" },
         toast.text
       )
     : null
 }
 
 function apply(ctx) {
-  const slots = ctx.slots || (typeof ctx.get === 'function' ? ctx.get('slots') : undefined)
+  const slots = ctx.slots || (typeof ctx.get === "function" ? ctx.get("slots") : undefined)
 
-  // Attach global keyboard, paste, and drag/drop interceptors immediately
   let removeGlobalListeners = () => {}
-  if (typeof window !== 'undefined') {
-    window.addEventListener('keydown', onGlobalKeyDown, true)
-    window.addEventListener('paste', onGlobalPaste, true)
-    window.addEventListener('dragenter', onGlobalDragEnter, true)
-    window.addEventListener('dragover', onGlobalDragOver, true)
-    window.addEventListener('dragleave', onGlobalDragLeave, true)
-    window.addEventListener('drop', onGlobalDrop, true)
-    window.addEventListener('dragend', onGlobalDragEnd)
+  if (typeof window !== "undefined") {
+    window.addEventListener("keydown", onGlobalKeyDown, true)
+    window.addEventListener("paste", onGlobalPaste, true)
+    window.addEventListener("dragenter", onGlobalDragEnter, true)
+    window.addEventListener("dragover", onGlobalDragOver, true)
+    window.addEventListener("dragleave", onGlobalDragLeave, true)
+    window.addEventListener("drop", onGlobalDrop, true)
+    window.addEventListener("dragend", onGlobalDragEnd)
 
     removeGlobalListeners = () => {
-      window.removeEventListener('keydown', onGlobalKeyDown, true)
-      window.removeEventListener('paste', onGlobalPaste, true)
-      window.removeEventListener('dragenter', onGlobalDragEnter, true)
-      window.removeEventListener('dragover', onGlobalDragOver, true)
-      window.removeEventListener('dragleave', onGlobalDragLeave, true)
-      window.removeEventListener('drop', onGlobalDrop, true)
-      window.removeEventListener('dragend', onGlobalDragEnd)
+      window.removeEventListener("keydown", onGlobalKeyDown, true)
+      window.removeEventListener("paste", onGlobalPaste, true)
+      window.removeEventListener("dragenter", onGlobalDragEnter, true)
+      window.removeEventListener("dragover", onGlobalDragOver, true)
+      window.removeEventListener("dragleave", onGlobalDragLeave, true)
+      window.removeEventListener("drop", onGlobalDrop, true)
+      window.removeEventListener("dragend", onGlobalDragEnd)
     }
   }
 
@@ -540,7 +552,7 @@ function apply(ctx) {
     peekTimer = null
   }
   const onVisibility = () => {
-    const hidden = typeof document !== 'undefined' && document.visibilityState === 'hidden'
+    const hidden = typeof document !== "undefined" && document.visibilityState === "hidden"
     if (hidden) stopPeek()
     else startPeek()
   }
@@ -548,48 +560,45 @@ function apply(ctx) {
   remoteDisabled = false
   stopPeekHook = stopPeek
   startPeek()
-  if (typeof document !== 'undefined') {
-    document.addEventListener('visibilitychange', onVisibility)
-    window.addEventListener('focus', refreshPeek)
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", onVisibility)
+    window.addEventListener("focus", refreshPeek)
   }
 
-  if (typeof ctx.effect === 'function') {
+  if (typeof ctx.effect === "function") {
     ctx.effect(() => () => {
       if (stopPeekHook === stopPeek) stopPeekHook = null
       stopPeek()
       removeGlobalListeners()
-      if (typeof document !== 'undefined') {
-        document.removeEventListener('visibilitychange', onVisibility)
-        window.removeEventListener('focus', refreshPeek)
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", onVisibility)
+        window.removeEventListener("focus", refreshPeek)
       }
       if (toastTimer !== null) clearTimeout(toastTimer)
       toastListeners.clear()
       peekListeners.clear()
-      
     })
   }
 
-  if (slots && typeof slots.inject === 'function') {
-    // Register Button in composer input left tool row
-    slots.inject('conversation.input.left', () =>
+  if (slots && typeof slots.inject === "function") {
+    slots.inject("conversation.input.left", () =>
       slots.register(
-        { name: 'conversation.input.left', id: 'dsh-paste-path', order: 30, label: '贴路径' },
+        { name: "conversation.input.left", id: "dsh-paste-path", order: 30, label: "贴路径" },
         () => React.createElement(PathButton, null)
       )
     )
 
-    // Register Toast in shell overlay (no heavy modal/overlay)
-    slots.inject('shell.overlay', () =>
+    slots.inject("shell.overlay", () =>
       slots.register(
-        { name: 'shell.overlay', id: 'dsh-paste-path-overlay', order: 90, label: '路径粘贴提示' },
+        { name: "shell.overlay", id: "dsh-paste-path-overlay", order: 90, label: "路径粘贴提示" },
         () => React.createElement(ToastOverlay, null)
       )
     )
   }
 }
 
-module.exports = { name: 'dsh-paste-path', apply }
-module.exports.inject = ['slots']
+module.exports = { name: "dsh-paste-path", apply }
+module.exports.inject = ["slots"]
 
     return module.exports
   },
