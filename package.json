@@ -1,7 +1,7 @@
 {
   "name": "dsh-paste-path",
   "version": "0.2.0",
-  "description": "DeepSeek Harness plugin: Smart drag-and-drop for any files/folders and Finder clipboard path pasting (Ctrl+V / Button)",
+  "description": "DeepSeek Harness plugin: Smart drag-and-drop for any files/folders and clipboard file path pasting (Native Paste / Button)",
   "type": "module",
   "main": "./index.js",
   "exports": {

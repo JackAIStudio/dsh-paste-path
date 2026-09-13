@@ -1,5 +1,4 @@
 const React = require("react")
-const PEEK_ROUTE = "/dsh-paste-path/peek"
 const PASTE_ROUTE = "/dsh-paste-path/paste"
 const DROP_ROUTE = "/dsh-paste-path/resolve-drop"
 const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp", "gif", "bmp", "svg"])
@@ -12,6 +11,7 @@ const IMAGE_MIME_TYPES = new Set([
   "image/bmp",
   "image/svg+xml",
 ])
+
 function isImageFile(name, type) {
   if (type && IMAGE_MIME_TYPES.has(type.toLowerCase())) return true
   if (name && typeof name === "string") {
@@ -23,6 +23,7 @@ function isImageFile(name, type) {
   }
   return false
 }
+
 function isTransferPureImages(dataTransfer) {
   if (!dataTransfer) return false
   if (dataTransfer.items && dataTransfer.items.length > 0) {
@@ -43,18 +44,16 @@ function isTransferPureImages(dataTransfer) {
   }
   return false
 }
+
 let toastState = null
 const toastListeners = new Set()
 let toastTimer = null
-let peekReady = false
-const peekListeners = new Set()
-let peekInFlight = false
-let remoteDisabled = false
-let stopPeekHook = null
 let dragDepth = 0
+
 function emit(listeners) {
   for (const fn of listeners) fn()
 }
+
 function showToast(text, isError = false) {
   if (toastTimer !== null) clearTimeout(toastTimer)
   toastState = { text, isError }
@@ -64,11 +63,7 @@ function showToast(text, isError = false) {
     emit(toastListeners)
   }, 3200)
 }
-function applyPeek(ready) {
-  if (peekReady === ready) return
-  peekReady = ready
-  emit(peekListeners)
-}
+
 function setHighlightInput(active) {
   if (typeof document === "undefined") return
   const card = document.querySelector("[data-composer-card]") || document.querySelector("div[data-composer-input]")
@@ -77,6 +72,7 @@ function setHighlightInput(active) {
     else card.classList.remove("dshpp-drag-over")
   }
 }
+
 let inResetDrag = false
 function resetDrag() {
   if (inResetDrag) return
@@ -88,6 +84,7 @@ function resetDrag() {
     inResetDrag = false
   }
 }
+
 async function requestJson(url, options = {}) {
   const res = await fetch(url, {
     ...options,
@@ -112,24 +109,7 @@ async function requestJson(url, options = {}) {
   }
   return data
 }
-function refreshPeek() {
-  if (peekInFlight || remoteDisabled) return
-  peekInFlight = true
-  requestJson(PEEK_ROUTE, { method: "GET" }).then(
-    (res) => {
-      peekInFlight = false
-      applyPeek(Boolean(res && res.ready))
-    },
-    (err) => {
-      peekInFlight = false
-      if (err && (err.code === "remote-not-supported" || err.status === 403)) {
-        remoteDisabled = true
-        applyPeek(false)
-        if (stopPeekHook !== null) stopPeekHook()
-      }
-    }
-  )
-}
+
 function findComposerElement() {
   return (
     document.querySelector("div[data-composer-input]") ||
@@ -139,6 +119,7 @@ function findComposerElement() {
     document.querySelector("textarea")
   )
 }
+
 function insertPathsToComposer(paths) {
   if (!paths || paths.length === 0) return 0
   const composer = findComposerElement()
@@ -164,8 +145,6 @@ function insertPathsToComposer(paths) {
       sel.addRange(range)
     }
   }
-
-  const firstPath = cleanPaths[0]
 
   // 3. 逐行插入，并在每行之间通过 Shift+Enter 派发原生断行
   try {
@@ -213,12 +192,10 @@ function doPastePaths() {
       pasteInFlight = false
       const paths = res && Array.isArray(res.paths) ? res.paths : []
       if (paths.length === 0) {
-        applyPeek(false)
         showToast(res && res.error ? res.error : "剪贴板里没有文件路径。请在访达中选中文件按 Cmd+C 后再试。", true)
         return
       }
       insertPathsToComposer(paths)
-      applyPeek(true)
     },
     (err) => {
       pasteInFlight = false
@@ -226,10 +203,12 @@ function doPastePaths() {
     }
   )
 }
+
 function hasDragFiles(e) {
   const dt = e.dataTransfer
   return Boolean(dt && dt.types && (dt.types.includes("Files") || dt.types.includes("public.file-url")))
 }
+
 function onGlobalDragEnter(e) {
   if (!hasDragFiles(e)) return
   if (isTransferPureImages(e.dataTransfer)) {
@@ -241,6 +220,7 @@ function onGlobalDragEnter(e) {
   dragDepth += 1
   setHighlightInput(true)
 }
+
 function onGlobalDragOver(e) {
   if (!hasDragFiles(e)) return
   if (isTransferPureImages(e.dataTransfer)) {
@@ -252,6 +232,7 @@ function onGlobalDragOver(e) {
   e.dataTransfer.dropEffect = "copy"
   setHighlightInput(true)
 }
+
 function onGlobalDragLeave(e) {
   if (!hasDragFiles(e)) return
   if (isTransferPureImages(e.dataTransfer)) {
@@ -265,6 +246,7 @@ function onGlobalDragLeave(e) {
     setHighlightInput(false)
   }
 }
+
 async function onGlobalDrop(e) {
   if (!hasDragFiles(e)) return
   const files = Array.from(e.dataTransfer.files || [])
@@ -281,7 +263,17 @@ async function onGlobalDrop(e) {
     e.stopPropagation()
   }
   resetDrag()
-  // Try direct URI list if available
+
+  // 1. In Electron desktop environment, files have direct native path property
+  const electronPaths = files
+    .map((f) => (f && typeof f.path === "string" ? f.path.trim() : ""))
+    .filter(Boolean)
+  if (electronPaths.length > 0) {
+    insertPathsToComposer(electronPaths)
+    return
+  }
+
+  // 2. Try direct URI list if available
   let directPaths = []
   try {
     const uriList = e.dataTransfer.getData("text/uri-list") || ""
@@ -297,6 +289,7 @@ async function onGlobalDrop(e) {
     insertPathsToComposer(directPaths)
     return
   }
+
   const filePayload = files.map((f) => ({
     name: f.name,
     size: f.size,
@@ -305,6 +298,7 @@ async function onGlobalDrop(e) {
   if (filePayload.length === 0) {
     filePayload.push({ name: "", size: 0, type: "" })
   }
+
   try {
     const res = await requestJson(DROP_ROUTE, {
       method: "POST",
@@ -321,21 +315,11 @@ async function onGlobalDrop(e) {
     showToast(err && err.message ? err.message : "解析拖拽路径失败", true)
   }
 }
+
 function onGlobalDragEnd() {
   resetDrag()
 }
-function onGlobalKeyDown(e) {
-  if (!e || e.isComposing) return
-  // Ctrl + V
-  if (e.ctrlKey && !e.metaKey && !e.altKey) {
-    if (typeof e.key === "string" && e.key.toLowerCase() === "v") {
-      e.preventDefault()
-      if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation()
-      else e.stopPropagation()
-      doPastePaths()
-    }
-  }
-}
+
 function onGlobalPaste(e) {
   const cd = e.clipboardData
   if (!cd) return
@@ -352,64 +336,7 @@ function onGlobalPaste(e) {
     }
   }
 }
-function PathButton() {
-  const [ready, setReady] = React.useState(peekReady)
-  React.useEffect(() => {
-    const listener = () => setReady(peekReady)
-    peekListeners.add(listener)
-    return () => {
-      peekListeners.delete(listener)
-    }
-  }, [])
-  const onClick = (e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    doPastePaths()
-  }
-  const onMouseDown = (e) => {
-    e.preventDefault()
-  }
-  return React.createElement(
-    "button",
-    {
-      type: "button",
-      className: ready ? "dshpp-btn is-ready" : "dshpp-btn",
-      title: "点击或按 Ctrl+V / Cmd+V 粘贴访达中选中的文件路径",
-      onMouseDown,
-      onClick,
-    },
-    React.createElement(
-      "span",
-      { className: "dshpp-btn-icon" },
-      React.createElement(
-        "svg",
-        {
-          width: "14",
-          height: "14",
-          viewBox: "0 0 24 24",
-          fill: "none",
-          stroke: "currentColor",
-          strokeWidth: "2",
-          strokeLinecap: "round",
-          strokeLinejoin: "round",
-        },
-        React.createElement("path", {
-          d: "M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2",
-        }),
-        React.createElement("rect", {
-          x: "8",
-          y: "2",
-          width: "8",
-          height: "4",
-          rx: "1",
-          ry: "1",
-        })
-      )
-    ),
-    React.createElement("span", { className: "dshpp-btn-text" }, "贴路径"),
-    React.createElement("span", { className: "dshpp-btn-shortcut" }, "⌃V")
-  )
-}
+
 function ToastOverlay() {
   const [toast, setToast] = React.useState(toastState)
   React.useEffect(() => {
@@ -427,11 +354,12 @@ function ToastOverlay() {
       )
     : null
 }
+
 function apply(ctx) {
   const slots = ctx.slots || (typeof ctx.get === "function" ? ctx.get("slots") : undefined)
   let removeGlobalListeners = () => {}
+
   if (typeof window !== "undefined") {
-    window.addEventListener("keydown", onGlobalKeyDown, true)
     window.addEventListener("paste", onGlobalPaste, true)
     window.addEventListener("dragenter", onGlobalDragEnter, true)
     window.addEventListener("dragover", onGlobalDragOver, true)
@@ -439,7 +367,6 @@ function apply(ctx) {
     window.addEventListener("drop", onGlobalDrop, true)
     window.addEventListener("dragend", onGlobalDragEnd)
     removeGlobalListeners = () => {
-      window.removeEventListener("keydown", onGlobalKeyDown, true)
       window.removeEventListener("paste", onGlobalPaste, true)
       window.removeEventListener("dragenter", onGlobalDragEnter, true)
       window.removeEventListener("dragover", onGlobalDragOver, true)
@@ -448,50 +375,16 @@ function apply(ctx) {
       window.removeEventListener("dragend", onGlobalDragEnd)
     }
   }
-  let peekTimer = null
-  const startPeek = () => {
-    if (remoteDisabled || peekTimer !== null) return
-    refreshPeek()
-    peekTimer = setInterval(refreshPeek, 1500)
-  }
-  const stopPeek = () => {
-    if (peekTimer === null) return
-    clearInterval(peekTimer)
-    peekTimer = null
-  }
-  const onVisibility = () => {
-    const hidden = typeof document !== "undefined" && document.visibilityState === "hidden"
-    if (hidden) stopPeek()
-    else startPeek()
-  }
-  remoteDisabled = false
-  stopPeekHook = stopPeek
-  startPeek()
-  if (typeof document !== "undefined") {
-    document.addEventListener("visibilitychange", onVisibility)
-    window.addEventListener("focus", refreshPeek)
-  }
+
   if (typeof ctx.effect === "function") {
     ctx.effect(() => () => {
-      if (stopPeekHook === stopPeek) stopPeekHook = null
-      stopPeek()
       removeGlobalListeners()
-      if (typeof document !== "undefined") {
-        document.removeEventListener("visibilitychange", onVisibility)
-        window.removeEventListener("focus", refreshPeek)
-      }
       if (toastTimer !== null) clearTimeout(toastTimer)
       toastListeners.clear()
-      peekListeners.clear()
     })
   }
+
   if (slots && typeof slots.inject === "function") {
-    slots.inject("conversation.input.left", () =>
-      slots.register(
-        { name: "conversation.input.left", id: "dsh-paste-path", order: 30, label: "贴路径" },
-        () => React.createElement(PathButton, null)
-      )
-    )
     slots.inject("shell.overlay", () =>
       slots.register(
         { name: "shell.overlay", id: "dsh-paste-path-overlay", order: 90, label: "路径粘贴提示" },
@@ -500,5 +393,6 @@ function apply(ctx) {
     )
   }
 }
+
 module.exports = { name: "dsh-paste-path", apply }
 module.exports.inject = ["slots"]

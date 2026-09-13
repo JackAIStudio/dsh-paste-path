@@ -43,21 +43,6 @@ const CLIPBOARD_APPLESCRIPT = [
   'return out',
 ].join('\n')
 
-const FINDER_SELECTION_JXA = `
-(() => {
-  try {
-    const finder = Application("Finder");
-    const selection = finder.selection();
-    if (!selection || selection.length === 0) return "";
-    return selection.map(item => {
-      try { return item.url().replace(/^file:\\/\\//, ""); } catch(e) { return ""; }
-    }).filter(Boolean).map(decodeURIComponent).join("\\n");
-  } catch (e) {
-    return "";
-  }
-})()
-`
-
 function writeToSystemClipboard(text) {
   return new Promise((resolve) => {
     try {
@@ -169,12 +154,6 @@ async function readClipboardPaths(cache) {
   return result
 }
 
-async function getFinderSelectionPaths() {
-  const ran = await runScript('osascript', ['-l', 'JavaScript'], FINDER_SELECTION_JXA)
-  if (!ran.ok || !ran.text.trim()) return []
-  return parsePaths(ran.text)
-}
-
 async function fallbackFindPath(name, size) {
   try {
     const { stdout } = await execFileAsync('mdfind', ['-name', name], { timeout: 2000 })
@@ -205,27 +184,7 @@ async function fallbackFindPath(name, size) {
 async function resolveDroppedFiles(files, cache) {
   if (!Array.isArray(files) || files.length === 0) return []
 
-  // 1. Try Finder selection first (best and exact for files dragged from Finder)
-  const finderPaths = await getFinderSelectionPaths()
-  if (finderPaths.length > 0) {
-    if (files.length === 1) {
-      // Single file or folder dropped
-      const hit = finderPaths.find(p => path.basename(p) === files[0].name)
-      return [hit || finderPaths[0]]
-    }
-    if (finderPaths.length === files.length) {
-      return finderPaths
-    }
-    const matched = []
-    for (const f of files) {
-      const hit = finderPaths.find(p => path.basename(p) === f.name)
-      if (hit) matched.push(hit)
-    }
-    if (matched.length > 0) return matched
-    return finderPaths
-  }
-
-  // 2. Try clipboard paths as second heuristic (user may have selected/copied file)
+  // 1. Try clipboard paths as first heuristic (user may have selected/copied file)
   try {
     const clip = await readClipboardPaths(cache || { lastChangeCount: null, lastResult: null })
     if (clip && clip.ready && clip.paths.length > 0) {
@@ -238,12 +197,12 @@ async function resolveDroppedFiles(files, cache) {
     }
   } catch {}
 
-  // 3. Fallback to mdfind search per file
+  // 2. Fallback to mdfind search per file
   const resolved = []
   for (const f of files) {
     if (!f || !f.name) continue
-    const found = await fallbackFindPath(f.name, f.size)
-    if (found) resolved.push(found)
+    const hit = await fallbackFindPath(f.name, f.size)
+    if (hit) resolved.push(hit)
   }
   return resolved
 }
@@ -279,13 +238,7 @@ function registerRoutes(ctx) {
           return
         }
         try {
-          let result = await readClipboardPaths(cache)
-          if (!result.ready) {
-            const fPaths = await getFinderSelectionPaths()
-            if (fPaths.length > 0) {
-              result = { ready: true, count: fPaths.length }
-            }
-          }
+          const result = await readClipboardPaths(cache)
           sendJson(res, 200, { ready: result.ready, count: result.count })
         } catch (error) {
           sendJson(res, 500, { error: errorMessage(error) })
@@ -308,21 +261,17 @@ function registerRoutes(ctx) {
           return
         }
         try {
-          let result = await readClipboardPaths(cache)
-          if (!result.ready || result.paths.length === 0) {
-            const fPaths = await getFinderSelectionPaths()
-            if (fPaths.length > 0) {
-              result = { ready: true, count: fPaths.length, paths: fPaths.map(p => ({ path: p, ok: true })) }
-            }
-          }
+          const result = await readClipboardPaths(cache)
           if (!result.ready || result.paths.length === 0) {
             sendJson(res, 200, {
               paths: [],
-              error: '剪贴板与访达中均未发现选中的文件路径。请在访达中选中文件后重试。',
+              error: '剪贴板中未检测到复制的文件或有效路径。请先在访达中复制文件（Cmd+C）。',
             })
             return
           }
-          const allPaths = result.paths.map(p => p.path); writeToSystemClipboard(allPaths.join(String.fromCharCode(10))); sendJson(res, 200, { paths: allPaths });
+          const allPaths = result.paths.map(p => p.path)
+          writeToSystemClipboard(allPaths.join(String.fromCharCode(10)))
+          sendJson(res, 200, { paths: allPaths })
         } catch (error) {
           sendJson(res, 500, { error: errorMessage(error) })
         }
