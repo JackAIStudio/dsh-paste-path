@@ -210,16 +210,6 @@ function insertPathsToComposer(paths) {
     } catch {}
   }
 
-  // 5. DOM 直接插入保底
-  textNow = composer.innerText || ''
-  if (!textNow.includes(firstPath)) {
-    try {
-      for (let i = 0; i < cleanPaths.length; i++) {
-        document.execCommand('insertText', false, cleanPaths[i])
-      }
-    } catch {}
-  }
-
   composer.dispatchEvent(new Event('input', { bubbles: true }))
 
   if (cleanPaths.length === 1) {
