@@ -2,7 +2,7 @@ window.__ModuleLoader__.load({
   id: 'dsh-paste-path',
   factory: (require) => {
     const module = { exports: {} }
-    const css = ".dshpp-btn {\n  appearance: none;\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  height: 24px;\n  padding: 0 8px;\n  border: 1px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, 0.2));\n  border-radius: 12px;\n  background: var(--dsw-alias-bg-layer-2, transparent);\n  color: var(--dsw-alias-label-secondary, #666);\n  font: inherit;\n  font-size: 11px;\n  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;\n  line-height: 24px;\n  cursor: pointer;\n  user-select: none;\n  white-space: nowrap;\n  transition: all 120ms ease;\n}\n\n.dshpp-btn:hover {\n  background: var(--dsw-alias-interactive-bg-hover, rgba(128, 128, 128, 0.12));\n  color: var(--dsw-alias-label-primary, #111);\n  border-color: var(--dsw-alias-brand-primary, #2563eb);\n}\n\n.dshpp-btn.is-ready {\n  background: rgba(37, 99, 235, 0.08);\n  border-color: rgba(37, 99, 235, 0.35);\n  color: var(--dsw-alias-brand-primary, #2563eb);\n}\n\n.dshpp-btn kbd {\n  margin: 0 1px;\n  padding: 1px 4px;\n  border: 1px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, 0.25));\n  border-radius: 4px;\n  font: inherit;\n  font-size: 10px;\n  background: var(--dsw-alias-bg-layer-1, rgba(255, 255, 255, 0.2));\n}\n\n.dshpp-btn-icon {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  flex-shrink: 0;\n}\n\n.dshpp-toast {\n  position: fixed;\n  right: 20px;\n  bottom: 84px;\n  max-width: 420px;\n  padding: 8px 14px;\n  border-radius: 8px;\n  background: var(--dsw-alias-bg-layer-3, #1e293b);\n  color: var(--dsw-alias-label-primary, #f8fafc);\n  font-size: 12px;\n  line-height: 18px;\n  pointer-events: none;\n  box-shadow: var(--dsw-shadow-lv3, 0 10px 15px -3px rgba(0, 0, 0, 0.3));\n  z-index: 1000;\n  animation: dshppFadeIn 150ms ease;\n  word-break: break-all;\n}\n\n.dshpp-toast.is-error {\n  background: #dc2626;\n  color: #ffffff;\n}\n\n/* 拖拽时输入框高亮，轻巧优雅，不挡视线 */\n[data-composer-card].dshpp-drag-over,\ndiv[data-composer-input=\"true\"].dshpp-drag-over {\n  border-color: var(--dsw-alias-brand-primary, #2563eb) !important;\n  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.3) !important;\n  transition: all 120ms ease;\n}\n\n/* 彻底隐藏原生容易卡死且限制图片的全屏蒙层 */\ndiv[role=\"status\"]:has(> div[class*=\"illustration\"]),\ndiv[class*=\"_mask\"]:has(div[class*=\"_illustration\"]),\ndiv[class*=\"BInVoG_mask\"] {\n  display: none !important;\n  opacity: 0 !important;\n  pointer-events: none !important;\n}\n\n@keyframes dshppFadeIn {\n  from { opacity: 0; transform: translateY(4px); }\n  to { opacity: 1; transform: translateY(0); }\n}\n"
+    const css = ".dshpp-btn {\n  appearance: none;\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  height: 28px;\n  padding: 0 8px;\n  border: none;\n  border-radius: 8px;\n  background: transparent;\n  color: var(--dsw-alias-label-secondary, #666);\n  font: inherit;\n  font-size: 13px;\n  font-weight: 500;\n  line-height: 28px;\n  cursor: pointer;\n  user-select: none;\n  white-space: nowrap;\n  transition: background-color 100ms ease, color 100ms ease;\n}\n\n.dshpp-btn:hover {\n  background: var(--dsw-alias-interactive-bg-hover, rgba(128, 128, 128, 0.08));\n  color: var(--dsw-alias-label-primary, #111);\n}\n\n.dshpp-btn.is-ready {\n  color: var(--dsw-alias-brand-primary, #2563eb);\n}\n\n.dshpp-btn.is-ready:hover {\n  background: rgba(37, 99, 235, 0.08);\n}\n\n.dshpp-btn-icon {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  flex-shrink: 0;\n  opacity: 0.85;\n}\n\n.dshpp-btn-text {\n  font-size: 13px;\n  font-weight: 500;\n  line-height: 20px;\n}\n\n.dshpp-btn-shortcut {\n  font-size: 11px;\n  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;\n  color: var(--dsw-alias-label-tertiary, #999);\n  margin-left: 1px;\n  opacity: 0.8;\n}\n\n.dshpp-btn.is-ready .dshpp-btn-shortcut {\n  color: var(--dsw-alias-brand-primary, #2563eb);\n  opacity: 0.65;\n}\n\n.dshpp-toast {\n  position: fixed;\n  right: 20px;\n  bottom: 84px;\n  max-width: 420px;\n  padding: 8px 14px;\n  border-radius: 8px;\n  background: var(--dsw-alias-bg-layer-3, #1e293b);\n  color: var(--dsw-alias-label-primary, #f8fafc);\n  font-size: 12px;\n  line-height: 18px;\n  pointer-events: none;\n  box-shadow: var(--dsw-shadow-lv3, 0 10px 15px -3px rgba(0, 0, 0, 0.3));\n  z-index: 1000;\n  animation: dshppFadeIn 150ms ease;\n  word-break: break-all;\n}\n\n.dshpp-toast.is-error {\n  background: #dc2626;\n  color: #ffffff;\n}\n\n/* 拖拽时输入框高亮，轻巧优雅，不挡视线 */\n[data-composer-card].dshpp-drag-over,\ndiv[data-composer-input=\"true\"].dshpp-drag-over {\n  border-color: var(--dsw-alias-brand-primary, #2563eb) !important;\n  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.3) !important;\n  transition: all 120ms ease;\n}\n\n/* 彻底隐藏原生容易卡死且限制图片的全屏蒙层 */\ndiv[role=\"status\"]:has(> div[class*=\"illustration\"]),\ndiv[class*=\"_mask\"]:has(div[class*=\"_illustration\"]),\ndiv[class*=\"BInVoG_mask\"] {\n  display: none !important;\n  opacity: 0 !important;\n  pointer-events: none !important;\n}\n\n@keyframes dshppFadeIn {\n  from { opacity: 0; transform: translateY(4px); }\n  to { opacity: 1; transform: translateY(0); }\n}\n"
     if (typeof document !== 'undefined') {
       const id = 'dsh-paste-path/ui.css'
       let tag = document.querySelector('style[data-plugin-css=' + JSON.stringify(id) + ']')
@@ -181,15 +181,13 @@ function insertPathsToComposer(paths) {
     return 0
   }
 
-  // Focus input
+  // 1. Focus input
   composer.focus()
 
   const cleanPaths = paths.map((p) => String(p || '').trim()).filter(Boolean)
   if (cleanPaths.length === 0) return 0
 
-  const textToInsert = cleanPaths.join(String.fromCharCode(10))
-
-  // Move selection inside composer if needed
+  // 2. Ensure cursor is in composer
   const sel = window.getSelection()
   if (!sel || sel.rangeCount === 0 || !composer.contains(sel.anchorNode)) {
     const range = document.createRange()
@@ -202,41 +200,39 @@ function insertPathsToComposer(paths) {
   }
 
   let success = false
+
+  // 3. Line-by-line insertion with true linebreaks
   try {
     if (document.queryCommandSupported && document.queryCommandSupported('insertText')) {
-      success = document.execCommand('insertText', false, textToInsert)
+      for (let i = 0; i < cleanPaths.length; i++) {
+        document.execCommand('insertText', false, cleanPaths[i])
+        if (i < cleanPaths.length - 1) {
+          if (!document.execCommand('insertLineBreak')) {
+            document.execCommand('insertParagraph')
+          }
+        }
+      }
+      success = true
     }
   } catch {
     success = false
   }
 
-  if (!success) {
-    try {
-      const event = new InputEvent('beforeinput', {
-        bubbles: true,
-        cancelable: true,
-        inputType: 'insertText',
-        data: textToInsert,
-      })
-      composer.dispatchEvent(event)
-      success = true
-    } catch {
-      success = false
-    }
-  }
-
+  // 4. Fallback via DocumentFragment with <br> elements
   if (!success) {
     try {
       const activeSel = window.getSelection()
       if (activeSel && activeSel.rangeCount > 0) {
         const range = activeSel.getRangeAt(0)
         range.deleteContents()
-        const textNode = document.createTextNode(textToInsert)
-        range.insertNode(textNode)
-        range.setStartAfter(textNode)
-        range.setEndAfter(textNode)
-        activeSel.removeAllRanges()
-        activeSel.addRange(range)
+        const fragment = document.createDocumentFragment()
+        for (let i = 0; i < cleanPaths.length; i++) {
+          fragment.appendChild(document.createTextNode(cleanPaths[i]))
+          if (i < cleanPaths.length - 1) {
+            fragment.appendChild(document.createElement('br'))
+          }
+        }
+        range.insertNode(fragment)
         composer.dispatchEvent(new Event('input', { bubbles: true }))
         success = true
       }
@@ -425,7 +421,7 @@ function PathButton() {
     {
       type: 'button',
       className: ready ? 'dshpp-btn is-ready' : 'dshpp-btn',
-      title: '点击或按 Ctrl+V 插入访达剪贴板中的文件绝对路径',
+      title: '点击或按 Ctrl+V / Cmd+V 粘贴访达中选中的文件路径',
       onClick,
     },
     React.createElement(
@@ -434,8 +430,8 @@ function PathButton() {
       React.createElement(
         'svg',
         {
-          width: '12',
-          height: '12',
+          width: '14',
+          height: '14',
           viewBox: '0 0 24 24',
           fill: 'none',
           stroke: 'currentColor',
@@ -456,10 +452,8 @@ function PathButton() {
         })
       )
     ),
-    React.createElement('kbd', null, 'Ctrl'),
-    '+',
-    React.createElement('kbd', null, 'V'),
-    ' 贴路径'
+    React.createElement('span', { className: 'dshpp-btn-text' }, '贴路径'),
+    React.createElement('span', { className: 'dshpp-btn-shortcut' }, '⌃V')
   )
 }
 

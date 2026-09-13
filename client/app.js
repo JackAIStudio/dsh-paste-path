@@ -165,15 +165,13 @@ function insertPathsToComposer(paths) {
     return 0
   }
 
-  // Focus input
+  // 1. Focus input
   composer.focus()
 
   const cleanPaths = paths.map((p) => String(p || '').trim()).filter(Boolean)
   if (cleanPaths.length === 0) return 0
 
-  const textToInsert = cleanPaths.join(String.fromCharCode(10))
-
-  // Move selection inside composer if needed
+  // 2. Ensure cursor is in composer
   const sel = window.getSelection()
   if (!sel || sel.rangeCount === 0 || !composer.contains(sel.anchorNode)) {
     const range = document.createRange()
@@ -186,41 +184,39 @@ function insertPathsToComposer(paths) {
   }
 
   let success = false
+
+  // 3. Line-by-line insertion with true linebreaks
   try {
     if (document.queryCommandSupported && document.queryCommandSupported('insertText')) {
-      success = document.execCommand('insertText', false, textToInsert)
+      for (let i = 0; i < cleanPaths.length; i++) {
+        document.execCommand('insertText', false, cleanPaths[i])
+        if (i < cleanPaths.length - 1) {
+          if (!document.execCommand('insertLineBreak')) {
+            document.execCommand('insertParagraph')
+          }
+        }
+      }
+      success = true
     }
   } catch {
     success = false
   }
 
-  if (!success) {
-    try {
-      const event = new InputEvent('beforeinput', {
-        bubbles: true,
-        cancelable: true,
-        inputType: 'insertText',
-        data: textToInsert,
-      })
-      composer.dispatchEvent(event)
-      success = true
-    } catch {
-      success = false
-    }
-  }
-
+  // 4. Fallback via DocumentFragment with <br> elements
   if (!success) {
     try {
       const activeSel = window.getSelection()
       if (activeSel && activeSel.rangeCount > 0) {
         const range = activeSel.getRangeAt(0)
         range.deleteContents()
-        const textNode = document.createTextNode(textToInsert)
-        range.insertNode(textNode)
-        range.setStartAfter(textNode)
-        range.setEndAfter(textNode)
-        activeSel.removeAllRanges()
-        activeSel.addRange(range)
+        const fragment = document.createDocumentFragment()
+        for (let i = 0; i < cleanPaths.length; i++) {
+          fragment.appendChild(document.createTextNode(cleanPaths[i]))
+          if (i < cleanPaths.length - 1) {
+            fragment.appendChild(document.createElement('br'))
+          }
+        }
+        range.insertNode(fragment)
         composer.dispatchEvent(new Event('input', { bubbles: true }))
         success = true
       }
@@ -409,7 +405,7 @@ function PathButton() {
     {
       type: 'button',
       className: ready ? 'dshpp-btn is-ready' : 'dshpp-btn',
-      title: '点击或按 Ctrl+V 插入访达剪贴板中的文件绝对路径',
+      title: '点击或按 Ctrl+V / Cmd+V 粘贴访达中选中的文件路径',
       onClick,
     },
     React.createElement(
@@ -418,8 +414,8 @@ function PathButton() {
       React.createElement(
         'svg',
         {
-          width: '12',
-          height: '12',
+          width: '14',
+          height: '14',
           viewBox: '0 0 24 24',
           fill: 'none',
           stroke: 'currentColor',
@@ -440,10 +436,8 @@ function PathButton() {
         })
       )
     ),
-    React.createElement('kbd', null, 'Ctrl'),
-    '+',
-    React.createElement('kbd', null, 'V'),
-    ' 贴路径'
+    React.createElement('span', { className: 'dshpp-btn-text' }, '贴路径'),
+    React.createElement('span', { className: 'dshpp-btn-shortcut' }, '⌃V')
   )
 }
 

@@ -3,42 +3,33 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  height: 24px;
+  height: 28px;
   padding: 0 8px;
-  border: 1px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, 0.2));
-  border-radius: 12px;
-  background: var(--dsw-alias-bg-layer-2, transparent);
+  border: none;
+  border-radius: 8px;
+  background: transparent;
   color: var(--dsw-alias-label-secondary, #666);
   font: inherit;
-  font-size: 11px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  line-height: 24px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 28px;
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
-  transition: all 120ms ease;
+  transition: background-color 100ms ease, color 100ms ease;
 }
 
 .dshpp-btn:hover {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(128, 128, 128, 0.12));
+  background: var(--dsw-alias-interactive-bg-hover, rgba(128, 128, 128, 0.08));
   color: var(--dsw-alias-label-primary, #111);
-  border-color: var(--dsw-alias-brand-primary, #2563eb);
 }
 
 .dshpp-btn.is-ready {
-  background: rgba(37, 99, 235, 0.08);
-  border-color: rgba(37, 99, 235, 0.35);
   color: var(--dsw-alias-brand-primary, #2563eb);
 }
 
-.dshpp-btn kbd {
-  margin: 0 1px;
-  padding: 1px 4px;
-  border: 1px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, 0.25));
-  border-radius: 4px;
-  font: inherit;
-  font-size: 10px;
-  background: var(--dsw-alias-bg-layer-1, rgba(255, 255, 255, 0.2));
+.dshpp-btn.is-ready:hover {
+  background: rgba(37, 99, 235, 0.08);
 }
 
 .dshpp-btn-icon {
@@ -46,6 +37,26 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.dshpp-btn-text {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.dshpp-btn-shortcut {
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: var(--dsw-alias-label-tertiary, #999);
+  margin-left: 1px;
+  opacity: 0.8;
+}
+
+.dshpp-btn.is-ready .dshpp-btn-shortcut {
+  color: var(--dsw-alias-brand-primary, #2563eb);
+  opacity: 0.65;
 }
 
 .dshpp-toast {
