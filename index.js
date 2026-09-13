@@ -58,6 +58,19 @@ const FINDER_SELECTION_JXA = `
 })()
 `
 
+function writeToSystemClipboard(text) {
+  return new Promise((resolve) => {
+    try {
+      const child = spawn('pbcopy', [], { stdio: ['pipe', 'ignore', 'ignore'] })
+      child.on('error', () => resolve())
+      child.on('close', () => resolve())
+      child.stdin.end(String(text || ''))
+    } catch {
+      resolve()
+    }
+  })
+}
+
 function errorMessage(error) {
   return error instanceof Error ? error.message : String(error)
 }
@@ -309,7 +322,7 @@ function registerRoutes(ctx) {
             })
             return
           }
-          sendJson(res, 200, { paths: result.paths.map(p => p.path) })
+          const allPaths = result.paths.map(p => p.path); writeToSystemClipboard(allPaths.join(String.fromCharCode(10))); sendJson(res, 200, { paths: allPaths });
         } catch (error) {
           sendJson(res, 500, { error: errorMessage(error) })
         }
