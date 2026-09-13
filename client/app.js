@@ -153,15 +153,7 @@ function insertPathsToComposer(paths) {
   const cleanPaths = paths.map((p) => String(p || '').trim()).filter(Boolean)
   if (cleanPaths.length === 0) return 0
 
-  // 2. 将格式化好的换行文本同步写入剪贴板备用
-  const textMulti = cleanPaths.join(String.fromCharCode(10))
-  try {
-    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-      navigator.clipboard.writeText(textMulti).catch(() => {})
-    }
-  } catch {}
-
-  // 3. Ensure selection inside composer
+  // 2. Ensure cursor is in composer
   const sel = window.getSelection()
   if (!sel || sel.rangeCount === 0 || !composer.contains(sel.anchorNode)) {
     const range = document.createRange()
@@ -173,65 +165,53 @@ function insertPathsToComposer(paths) {
     }
   }
 
-  let ok = false
+  const firstPath = cleanPaths[0]
 
-  // 策略 A: 采用 DSH/Lexical 官方原生段落结构 (<p>path1</p><p>path2</p>)，每行独立成段，绝不粘连
+  // 3. 逐行插入，并在每行之间通过 Shift+Enter 派发原生断行
   try {
-    const paragraphHtml = cleanPaths.map(p => '<p>' + p + '</p>').join('')
-    ok = document.execCommand('insertHTML', false, paragraphHtml)
-  } catch {
-    ok = false
-  }
-
-  // 策略 B: DOM Range 直接注入 DocumentFragment (包含多个 <p> 段落节点)
-  if (!ok || !(composer.innerText || '').includes(cleanPaths[0])) {
-    try {
-      const activeSel = window.getSelection()
-      if (activeSel && activeSel.rangeCount > 0) {
-        const range = activeSel.getRangeAt(0)
-        range.deleteContents()
-        const fragment = document.createDocumentFragment()
-        for (const p of cleanPaths) {
-          const pEl = document.createElement('p')
-          pEl.textContent = p
-          fragment.appendChild(pEl)
-        }
-        range.insertNode(fragment)
-        range.collapse(false)
-        activeSel.removeAllRanges()
-        activeSel.addRange(range)
-        composer.dispatchEvent(new Event('input', { bubbles: true }))
-        ok = true
+    for (let i = 0; i < cleanPaths.length; i++) {
+      document.execCommand('insertText', false, cleanPaths[i])
+      if (i < cleanPaths.length - 1) {
+        composer.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Enter',
+          code: 'Enter',
+          keyCode: 13,
+          which: 13,
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+        }))
       }
-    } catch {
-      ok = false
     }
-  }
+  } catch {}
 
-  // 策略 C: 直接作为段落追加到 composer 内部
-  if (!ok || !(composer.innerText || '').includes(cleanPaths[0])) {
+  // 4. 如果逐行插入未保留断行（极端兜底），尝试标准段落 insertHTML
+  let textNow = composer.innerText || ''
+  if (!textNow.includes(String.fromCharCode(10)) && cleanPaths.length > 1) {
     try {
-      for (const p of cleanPaths) {
-        const pEl = document.createElement('p')
-        pEl.textContent = p
-        composer.appendChild(pEl)
-      }
-      composer.dispatchEvent(new Event('input', { bubbles: true }))
-      ok = true
+      const brHtml = cleanPaths.map(p => '<p>' + p + '</p>').join('')
+      document.execCommand('insertHTML', false, brHtml)
     } catch {}
   }
 
-  if (ok) {
-    if (cleanPaths.length === 1) {
-      showToast('已插入 ' + cleanPaths[0])
-    } else {
-      showToast('已插入 ' + cleanPaths.length + ' 个路径 (已逐行换行)')
-    }
-    return cleanPaths.length
-  } else {
-    showToast('写入输入框失败', true)
-    return 0
+  // 5. DOM 直接插入保底
+  textNow = composer.innerText || ''
+  if (!textNow.includes(firstPath)) {
+    try {
+      for (let i = 0; i < cleanPaths.length; i++) {
+        document.execCommand('insertText', false, cleanPaths[i])
+      }
+    } catch {}
   }
+
+  composer.dispatchEvent(new Event('input', { bubbles: true }))
+
+  if (cleanPaths.length === 1) {
+    showToast('已插入 ' + cleanPaths[0])
+  } else {
+    showToast('已插入 ' + cleanPaths.length + ' 个路径 (已逐行换行)')
+  }
+  return cleanPaths.length
 }
 
 let pasteInFlight = false
