@@ -200,25 +200,50 @@ function insertPathsToComposer(paths) {
   }
 
   let success = false
+  const editor = composer.__lexicalEditor
 
-  // 3. Line-by-line insertion with true linebreaks
-  try {
-    if (document.queryCommandSupported && document.queryCommandSupported('insertText')) {
+  // 3. Primary Method: Native Lexical Command Dispatch (Guaranteed True LineBreak in Lexical State)
+  if (editor && typeof editor.dispatchCommand === 'function') {
+    try {
+      const textCmd = { type: 'CONTROLLED_TEXT_INSERTION_COMMAND' }
+      const breakCmd = { type: 'INSERT_LINE_BREAK_COMMAND' }
       for (let i = 0; i < cleanPaths.length; i++) {
-        document.execCommand('insertText', false, cleanPaths[i])
+        editor.dispatchCommand(textCmd, cleanPaths[i])
         if (i < cleanPaths.length - 1) {
-          if (!document.execCommand('insertLineBreak')) {
-            document.execCommand('insertParagraph')
-          }
+          editor.dispatchCommand(breakCmd, false)
         }
       }
       success = true
+    } catch {
+      success = false
     }
-  } catch {
-    success = false
   }
 
-  // 4. Fallback via DocumentFragment with <br> elements
+  // 4. Fallback: InputEvent with insertText & insertLineBreak
+  if (!success) {
+    try {
+      for (let i = 0; i < cleanPaths.length; i++) {
+        composer.dispatchEvent(new InputEvent('beforeinput', {
+          bubbles: true,
+          cancelable: true,
+          inputType: 'insertText',
+          data: cleanPaths[i],
+        }))
+        if (i < cleanPaths.length - 1) {
+          composer.dispatchEvent(new InputEvent('beforeinput', {
+            bubbles: true,
+            cancelable: true,
+            inputType: 'insertLineBreak',
+          }))
+        }
+      }
+      success = true
+    } catch {
+      success = false
+    }
+  }
+
+  // 5. Fallback: Range insertion with DocumentFragment and <br> elements
   if (!success) {
     try {
       const activeSel = window.getSelection()
@@ -233,6 +258,7 @@ function insertPathsToComposer(paths) {
           }
         }
         range.insertNode(fragment)
+        range.collapse(false)
         composer.dispatchEvent(new Event('input', { bubbles: true }))
         success = true
       }
