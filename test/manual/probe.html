@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>dsh-paste-path 注入行为实测</title>
+<style>
+  body { font: 14px -apple-system, sans-serif; margin: 20px; }
+  h1 { font-size: 14px; }
+  [data-composer-card] { border: 1px solid #cbd5e1; border-radius: 12px; padding: 10px; max-width: 880px; background: #fff; }
+  [data-composer-input] { min-height: 110px; outline: none; white-space: pre-wrap; word-break: break-all;
+    font-family: ui-monospace, Menlo, monospace; font-size: 12px; line-height: 18px; }
+  #out { margin-top: 14px; white-space: pre-wrap; font-family: ui-monospace, Menlo, monospace;
+    font-size: 12px; background: #0f172a; color: #e2e8f0; padding: 12px; border-radius: 8px; max-width: 880px; }
+  .ok { color: #4ade80; } .bad { color: #f87171; }
+</style>
+</head>
+<body>
+<h1>dsh-paste-path 注入行为实测页（真实 Chromium，真实 contenteditable）</h1>
+<div data-composer-card><div data-composer-input contenteditable="true"></div></div>
+<div id="out">运行中…</div>
+
+<script src="./probe-lib.js"></script>
+<script>
+const out = document.getElementById('out')
+const L = []
+const log = (s) => { L.push(s) }
+const api = () => window.__dshPastePath__
+
+const P_APP = '/Applications/青椒云电脑.app'
+const P_CLOCK = '/System/Applications/Clock.app'
+const P_LONG = '/Users/jkw/Library/Mobile Documents/com~apple~CloudDocs/checkouts/SelectedTextKit/Sources/SelectedTextKit/Utilities'
+
+let failures = 0
+
+const lines = () => String(api().composerText()).split('\n').map((l) => l.trim()).filter((l) => l !== '')
+
+function check(label, expectedPaths, expectedTextLines) {
+  const ls = lines()
+  const extra = expectedTextLines || []
+  let bad = 0
+  for (const p of expectedPaths) {
+    const n = ls.filter((l) => l === p).length
+    if (n !== 1) { bad++; log('  ❌ ' + label + '：该路径出现 ' + n + ' 次（应为 1）→ ' + p) }
+  }
+  for (const t of extra) if (!ls.includes(t)) { bad++; log('  ❌ ' + label + '：缺少文本行 → ' + t) }
+  if (ls.length !== expectedPaths.length + extra.length) {
+    bad++
+    log('  ❌ ' + label + '：非空行数 ' + ls.length + '，应为 ' + (expectedPaths.length + extra.length))
+  }
+  if (bad === 0) log('  ✅ ' + label)
+  else { failures++; log('     各行: ' + JSON.stringify(ls)) }
+}
+
+function reset(text) {
+  api().reset()
+  api().clear()
+  if (text) api().type(text)
+}
+
+async function boot() {
+  if (!api()) { out.textContent = '❌ 插件未加载'; document.title = 'FAIL'; return }
+  log('✅ 插件已加载\n')
+  const flush = () => { out.textContent = L.join('\n') }
+  const guard = (p, label) => Promise.race([
+    p,
+    new Promise((r) => setTimeout(() => { log('  ⏱️ ' + label + ' 超时未返回'); flush(); r(0) }, 2500)),
+  ])
+  const settle = () => new Promise((r) => setTimeout(r, 0))
+
+  // 场景一：空框连插两条，每条各占一行
+  reset()
+  const r1 = await guard(api().insert(P_APP), 'insert#1')
+  flush()
+  log('  · insert#1 → ' + r1 + '，内容 ' + JSON.stringify(api().composerText()))
+  const r2 = await guard(api().insert(P_CLOCK), 'insert#2')
+  log('  · insert#2 → ' + r2 + '，内容 ' + JSON.stringify(api().composerText()))
+  check('场景一 空框插两条，各占一行', [P_APP, P_CLOCK])
+
+  // 场景二：重复插同一个（模拟多入口同时触发）
+  await api().insert(P_CLOCK)
+  await api().insert(P_CLOCK)
+  check('场景二 重复插入不产生重复', [P_APP, P_CLOCK])
+
+  // 场景三：带空格的超长路径
+  await api().insert(P_LONG)
+  check('场景三 超长带空格路径独占一行', [P_APP, P_CLOCK, P_LONG])
+
+  // 场景四：用户文字在上，路径收拢到末尾，中间空一行
+  reset('帮我看一下这个应用')
+  await api().insert(P_APP)
+  check('场景四 文字在上、路径在末尾', [P_APP], ['帮我看一下这个应用'])
+  if (!api().composerText().includes('\n\n')) { failures++; log('  ❌ 场景四：文字与路径之间应有空行') }
+
+  // 场景五：旧路径在前，新路径落末尾
+  // 注意：这里必须直接构造 DOM 内容来模拟「真实的多次插入」，
+  // 不能用 type()——execCommand('insertText') 会把 \n 退化成空格，
+  // 模拟不出跨行的真实输入（那是编辑器的行为，不是插件要负责的事）。
+  reset()
+  api().type(P_LONG)
+  api().breakLine()
+  api().breakLine()
+  api().type('帮我看一下')
+  check('场景五 准备：旧路径与文字', [P_LONG], ['帮我看一下'])
+  await api().insert(P_CLOCK)
+  check('场景五 新路径落末尾且不重复', [P_LONG, P_CLOCK], ['帮我看一下'])
+
+  // 场景六：同一批两条 + 重复调用
+  reset()
+  await api().insert([P_APP, P_LONG])
+  await api().insert([P_APP, P_LONG])
+  check('场景六 同批去重', [P_APP, P_LONG])
+
+  // 场景七：用户删掉后可以重新插入
+  reset()
+  await api().insert(P_APP)
+  api().clear()
+  await api().insert(P_APP)
+  check('场景七 清空后可重新插入', [P_APP])
+
+  // 场景八：插完光标在末尾，接着打字落在路径后面
+  reset()
+  await api().insert(P_APP)
+  const atEnd = api().caretAtEnd()
+  await api().type('接着说')
+  const t8 = api().composerText()
+  if (atEnd && t8.trimEnd().endsWith('接着说') && t8.indexOf(P_APP) < t8.indexOf('接着说')) {
+    log('  ✅ 场景八 插完光标在末尾，接着打字落在路径后')
+  } else {
+    failures++
+    log('  ❌ 场景八 光标未落末尾（caretAtEnd=' + atEnd + '）：' + JSON.stringify(t8))
+  }
+
+  await settle()
+  log('\n' + (failures === 0 ? '全部通过 ✅' : '失败 ' + failures + ' 项 ❌'))
+  out.textContent = L.join('\n')
+  out.className = failures === 0 ? 'ok' : 'bad'
+  document.title = failures === 0 ? 'PASS' : 'FAIL'
+}
+
+window.addEventListener('error', (e) => {
+  L.push('💥 未捕获异常: ' + e.message); failures++
+  out.textContent = L.join('\n'); document.title = 'FAIL'
+})
+
+setTimeout(boot, 300)
+</script>
+</body>
+</html>

@@ -1,15 +1,26 @@
 import { spawn, execFile } from 'node:child_process'
 import { Buffer } from 'node:buffer'
+import fs from 'node:fs'
 import fsPromises from 'node:fs/promises'
+import os from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
-import { isLoopbackAddress, isSameOriginMutation, parsePaths, normalizePathCandidate } from './paths.js'
+import {
+  isLoopbackAddress,
+  isSameOriginMutation,
+  parsePaths,
+  normalizePathCandidate,
+  inspectSinglePath,
+  fastFindAppPath,
+  fastFindByName,
+} from './paths.js'
 
 const execFileAsync = promisify(execFile)
 
 export const name = 'dsh-paste-path'
 export const inject = []
 
+const DIAG_ROUTE = '/dsh-paste-path/diag'
 const PEEK_ROUTE = '/dsh-paste-path/peek'
 const PASTE_ROUTE = '/dsh-paste-path/paste'
 const DROP_ROUTE = '/dsh-paste-path/resolve-drop'
@@ -54,6 +65,27 @@ function writeToSystemClipboard(text) {
       resolve()
     }
   })
+}
+
+/**
+ * 诊断落盘：把前端拖拽时的真实数据写进 ~/.dsh/dsh-paste-path-diag.log。
+ * 用途：拖拽问题只能在真实客户端复现，浏览器自动化无法模拟 macOS 原生拖拽
+ * （BrowserSkill 的拦截层会直接返回 501），所以让运行时自己把证据留下来。
+ */
+function diagLogPath() {
+  const home = process.env.DSH_HOME && process.env.DSH_HOME.trim() !== ''
+    ? process.env.DSH_HOME
+    : path.join(os.homedir(), '.dsh')
+  return path.join(home, 'dsh-paste-path-diag.log')
+}
+
+function appendDiag(entry) {
+  const line = `${new Date().toISOString()} ${JSON.stringify(entry)}\n`
+  try {
+    fs.appendFileSync(diagLogPath(), line)
+  } catch {
+    // 诊断不能影响主流程
+  }
 }
 
 function errorMessage(error) {
@@ -154,28 +186,60 @@ async function readClipboardPaths(cache) {
   return result
 }
 
+/**
+ * 「文件名 → 绝对路径」的兜底解析。
+ *
+ * 关键背景：JackDSH 是 Electron，renderer 关了 nodeIntegration、开了 contextIsolation，
+ * 而 Electron 又移除了 `File.path`。所以拖进来的目录/.app **在前端拿不到绝对路径**，
+ * 只能由同机的服务端去文件系统里找回来。
+ *
+ * 三级策略（按可靠性排序）：
+ *   1. 直接去常见目录按名字找（含子目录）—— 实测最快最准：
+ *      `.screenstudio` 86ms、`暂存` 11ms 就命中，且不依赖 Spotlight 索引。
+ *   2. `.app` 再去标准应用目录快速确认一次。
+ *   3. 最后用 `mdfind`，并对候选排序（精确同名的、路径浅的优先）。
+ */
 async function fallbackFindPath(name, size) {
+  if (!name || typeof name !== 'string') return null
+
+  // 1. 直接按名字在常见目录里找
+  try {
+    const hit = fastFindByName(name)
+    if (hit) return hit
+  } catch {}
+
+  // 2. .app 的标准位置
+  try {
+    if (name.endsWith('.app') || !path.extname(name)) {
+      const appHit = fastFindAppPath(name)
+      if (appHit) return appHit
+    }
+  } catch {}
+
+  // 3. mdfind 兜底
   try {
     const { stdout } = await execFileAsync('mdfind', ['-name', name], { timeout: 2000 })
     const lines = stdout.split('\n').map(l => l.trim()).filter(Boolean)
     if (lines.length === 0) return null
 
-    // Exact filename match filter
     const exact = lines.filter(p => path.basename(p) === name)
-    if (exact.length === 1) return exact[0]
 
-    const candidates = exact.length > 0 ? exact : lines
+    // 体积只能用于普通文件；目录的 stat.size 是元数据大小，拿来比会误判。
     if (size !== undefined && size > 0) {
-      for (const cand of candidates) {
+      for (const cand of exact.length > 0 ? exact : lines) {
         try {
           const stat = await fsPromises.stat(cand)
-          if (stat.size === size) return cand
-        } catch {
-          // ignore
-        }
+          if (stat.isFile() && stat.size === size) return cand
+        } catch {}
       }
     }
-    return candidates[0]
+
+    if (exact.length > 0) {
+      // 多个同名时取路径最浅的（通常是用户真正拖的那个）
+      exact.sort((a, b) => a.split('/').length - b.split('/').length)
+      return exact[0]
+    }
+    return null
   } catch {
     return null
   }
@@ -197,7 +261,7 @@ async function resolveDroppedFiles(files, cache) {
     }
   } catch {}
 
-  // 2. Fallback to mdfind search per file
+  // 2. Fallback to fast app search / mdfind search per file
   const resolved = []
   for (const f of files) {
     if (!f || !f.name) continue
@@ -226,6 +290,30 @@ function registerRoutes(ctx) {
 
   ctx.inject(['webServer'], (web) => {
     const webServer = web.get('webServer')
+
+    web.effect(() => webServer.register({
+      kind: 'exact',
+      path: DIAG_ROUTE,
+      async handler(req, res) {
+        if (rejectUnlessLocal(req, res)) return
+        if (req.method !== 'POST') {
+          res.setHeader('allow', 'POST')
+          sendJson(res, 405, { error: 'Method not allowed.' })
+          return
+        }
+        if (!isSameOriginMutation(req)) {
+          sendJson(res, 403, { error: 'Diagnostic requests require a same-origin browser request.' })
+          return
+        }
+        try {
+          const body = await readBodyJson(req)
+          appendDiag(body && typeof body === 'object' ? body : { raw: String(body) })
+          sendJson(res, 200, { ok: true, file: diagLogPath() })
+        } catch (error) {
+          sendJson(res, 500, { error: errorMessage(error) })
+        }
+      },
+    }), 'dsh-paste-path: diag')
 
     web.effect(() => webServer.register({
       kind: 'exact',
@@ -271,7 +359,8 @@ function registerRoutes(ctx) {
           }
           const allPaths = result.paths.map(p => p.path)
           writeToSystemClipboard(allPaths.join(String.fromCharCode(10)))
-          sendJson(res, 200, { paths: allPaths })
+          const items = (await Promise.all(allPaths.map(p => inspectSinglePath(p)))).filter(Boolean)
+          sendJson(res, 200, { paths: allPaths, items })
         } catch (error) {
           sendJson(res, 500, { error: errorMessage(error) })
         }

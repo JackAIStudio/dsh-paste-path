@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><title>拖拽诊断：浏览器到底给了什么</title>
+<style>
+ body{font:14px -apple-system,sans-serif;margin:20px;background:#0f172a;color:#e2e8f0}
+ #drop{border:2px dashed #64748b;border-radius:12px;padding:40px;text-align:center;max-width:900px;
+       margin-bottom:16px;background:#1e293b}
+ #drop.hot{border-color:#4ade80;background:#14532d}
+ pre{background:#020617;padding:14px;font-size:12px;white-space:pre-wrap;max-width:900px;border-radius:8px;
+     line-height:1.6}
+ h3{font-size:15px} .ok{color:#4ade80}.bad{color:#f87171}.warn{color:#fbbf24}
+</style></head>
+<body>
+<h3>拖拽诊断 —— 把你选中的那几项拖进下面的框里</h3>
+<div id="drop">把文件/文件夹拖到这里</div>
+<div data-composer-card style="display:none"><div data-composer-input contenteditable="true"></div></div>
+<pre id="out">等待拖拽…</pre>
+
+<script src="./probe-lib.js"></script>
+<script>
+const drop = document.getElementById('drop')
+const out = document.getElementById('out')
+const L = []
+const P = () => window.__dshPastePath__
+
+drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('hot') })
+drop.addEventListener('dragleave', () => drop.classList.remove('hot'))
+drop.addEventListener('drop', (e) => {
+  e.preventDefault()
+  e.stopPropagation()
+  drop.classList.remove('hot')
+  L.length = 0
+  const dt = e.dataTransfer
+
+  const line = (s) => L.push(s)
+
+  line('=== 原始 dataTransfer ===')
+  line('types              = ' + JSON.stringify([...(dt.types || [])]))
+  line('files.length       = ' + (dt.files ? dt.files.length : 'n/a'))
+  line('items.length       = ' + (dt.items ? dt.items.length : 'n/a'))
+  line('')
+
+  if (dt.files) {
+    line('=== dt.files（官方读的就是这个）===')
+    for (let i = 0; i < dt.files.length; i++) {
+      const f = dt.files[i]
+      line('[' + i + '] name=' + JSON.stringify(f.name))
+      line('     type=' + JSON.stringify(f.type) + '  size=' + f.size +
+           '  path=' + JSON.stringify(f.path) + '  lastModified=' + f.lastModified)
+      line('     name 的十六进制（查隐藏字符）: ' +
+           [...f.name].map((c) => c.codePointAt(0).toString(16)).join(' '))
+    }
+    line('')
+  }
+
+  if (dt.items) {
+    line('=== dt.items（我们用来判定目录的）===')
+    for (let i = 0; i < dt.items.length; i++) {
+      const it = dt.items[i]
+      const f = typeof it.getAsFile === 'function' ? it.getAsFile() : null
+      let entry = null
+      let isDir = 'n/a'
+      if (typeof it.webkitGetAsEntry === 'function') {
+        entry = it.webkitGetAsEntry()
+        isDir = entry ? entry.isDirectory : 'entry=null'
+      }
+      line('[' + i + '] kind=' + it.kind + ' type=' + JSON.stringify(it.type))
+      line('     getAsFile().name=' + JSON.stringify(f ? f.name : null))
+      line('     webkitGetAsEntry().isDirectory=' + isDir)
+      line('     webkitGetAsEntry().name=' + JSON.stringify(entry ? entry.name : null))
+    }
+    line('')
+  }
+
+  // 用插件真实的判定函数逐个过一遍
+  const api = P()
+  if (api && api.classify) {
+    line('=== 插件判定结果 ===')
+    const r = api.classify(dt)
+    line('归插件（目录/.app/包）= ' + JSON.stringify(r.targets.map((f) => f && f.name)))
+    line('归官方（图片/普通文件）= ' + JSON.stringify(r.natives.map((f) => f && f.name)))
+  } else {
+    line('（probe-lib 里没有 classify 接口，下面用 target/native 判定）')
+  }
+  if (api && api.judge) {
+    line('')
+    line('=== 逐个判定明细 ===')
+    for (const d of api.judge(dt)) line(d)
+  }
+
+  // 完整跑一遍插路径流程，看断在哪一步
+  if (api && api.runTargets) {
+    line('')
+    line('=== 插件完整处理结果（正在跑…）===')
+    out.textContent = L.join('\n')
+    api.runTargets(dt).then((r) => {
+      line('归插件的:      ' + JSON.stringify(r.targetNames))
+      line('归官方的:      ' + JSON.stringify(r.nativeNames))
+      line('直接拿到的路径: ' + JSON.stringify(r.directPaths))
+      if (r.resolved) line('后端解析的路径: ' + JSON.stringify(r.resolved))
+      if (r.resolveError) line('解析出错: ' + r.resolveError)
+      if (r.appendError) line('插入出错: ' + r.appendError)
+      line('写入条数:      ' + r.written)
+      line('输入框变成:    ' + JSON.stringify(r.after))
+      line('')
+      line(r.written === r.targetNames.length
+        ? '✅ 每一条都写进去了'
+        : '❌ 有 ' + (r.targetNames.length - r.written) + ' 条没写进去')
+      out.textContent = L.join('\n')
+    })
+  }
+
+  out.textContent = L.join('\n')
+})
+</script>
+</body></html>

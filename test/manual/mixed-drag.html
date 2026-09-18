@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><title>混合拖拽分流实测</title>
+<style>
+ body{font:14px -apple-system,sans-serif;margin:20px}
+ [data-composer-card]{border:1px solid #cbd5e1;border-radius:12px;padding:10px;max-width:900px;background:#fff}
+ [data-composer-input]{min-height:90px;outline:none;font:13px ui-monospace,Menlo,monospace;white-space:pre-wrap}
+ pre{background:#0f172a;color:#e2e8f0;padding:12px;font-size:12px;white-space:pre-wrap;max-width:900px;border-radius:8px}
+ .ok{color:#4ade80}.bad{color:#f87171}
+</style></head>
+<body>
+<h3>混合拖拽分流：目录归插件，图片/普通文件归官方</h3>
+<div data-composer-card><div data-composer-input contenteditable="true"></div></div>
+<pre id="out">运行中…</pre>
+
+<script>
+const out = document.getElementById('out')
+const L = []; const log = (s) => { L.push(s); out.textContent = L.join('\n') }
+let failures = 0
+
+// ===== 模拟「官方附件组件」：在 document 冒泡阶段监听 drop，只读 dataTransfer.files =====
+// （与 DSH 的 dsh-client-ui-attachment 完全一致的接入方式）
+window.__nativeReceived = []
+document.addEventListener('drop', (event) => {
+  const dt = event.dataTransfer
+  if (!dt || !dt.types || !dt.types.includes('Files')) return
+  event.preventDefault()
+  window.__nativeReceived.push([...dt.files].map((f) => f.name))
+}, false)
+
+// ===== 构造一次混合拖拽（访达：图片 + txt + 两个文件夹 + mov）=====
+// 模拟 Electron/DSH 客户端里的 File：它带一个 path 属性（真实绝对路径）。
+// 插件优先用 file.path，这样就不需要回调后端解析（本页也没有后端）。
+function makeFile(name, type, path) {
+  const f = new File([new Uint8Array([1, 2, 3])], name, { type: type || '' })
+  try {
+    Object.defineProperty(f, 'path', { value: path || ('/Users/jkw/Downloads/' + name), configurable: true })
+  } catch {}
+  return f
+}
+// 用真实的 DataTransfer 构造（DragEvent 只接受真的 DataTransfer）。
+// 注意：合成的 DataTransfer 无法表达"目录是目录"，所以这里靠"无 MIME 且无扩展名"
+// 来模拟目录/ .app —— 插件对目录的判定本来就是这两条判据，
+// 真实的 webkitGetAsEntry().isDirectory 只是额外确认。
+function makeTransfer(entries) {
+  const dt = new DataTransfer()
+  for (const e of entries) dt.items.add(e.file)
+  return dt
+}
+
+// 复现用户的真实组合（下载文件夹里选中的 4 项 + 两个对照）：
+// 两个 mp4 + 一个 .screenstudio 工程（包，底层是目录，之前就是它凭空消失）
+// + 一张 jpg + 一个目录 + 一个 .lnk（普通文件）
+const entries = [
+  { file: makeFile('Area 2026-09-17 03-32-39 不降噪.mp4', 'video/mp4', '/Users/jkw/Downloads/Area 2026-09-17 03-32-39 不降噪.mp4') },
+  { file: makeFile('Area 2026-08-29 19_27_28.screenstudio', '', '/Users/jkw/Downloads/Area 2026-08-29 19_27_28.screenstudio') },
+  { file: makeFile('摄像头构图对比.jpg', 'image/jpeg', '/Users/jkw/Downloads/摄像头构图对比.jpg') },
+  { file: makeFile('暂存', '', '/Users/jkw/Downloads/暂存') },
+  { file: makeFile('百度网盘.lnk', '', '/Users/jkw/Downloads/百度网盘.lnk') },
+]
+
+// 载入插件本体
+window.__ModuleLoader__ = { load(reg) { window.__reg = reg } }
+const s = document.createElement('script')
+s.src = './plugin-client.js'
+s.onload = () => {
+  const face = window.__reg.factory(() => ({}))
+  face.apply({ effect: () => {} })
+  setTimeout(run, 150)
+}
+s.onerror = () => { out.textContent = '❌ 插件加载失败'; document.title = 'FAIL' }
+document.head.appendChild(s)
+
+function check(label, cond, detail) {
+  if (cond) log('  ✅ ' + label)
+  else { failures++; log('  ❌ ' + label + (detail ? '\n     ' + detail : '')) }
+}
+
+async function run() {
+  const api = window.__dshPastePath__
+  log('✅ 插件已加载\n')
+
+  // 派发一次混合拖拽（从 window 捕获阶段开始，模拟真实浏览器行为）
+  const dt = makeTransfer(entries)
+  const ev = new DragEvent('drop', { bubbles: true, cancelable: true, composed: true, dataTransfer: dt })
+  document.dispatchEvent(ev)
+
+  await new Promise((r) => setTimeout(r, 300))
+
+  const text = api.composerText()
+  log('输入框内容: ' + JSON.stringify(text))
+  log('官方收到的文件: ' + JSON.stringify(window.__nativeReceived))
+  log('')
+
+  const lines = String(text).split('\n').map((l) => l.trim()).filter((l) => l !== '')
+  check('目录「暂存」被插件接管', lines.includes('/Users/jkw/Downloads/暂存'), JSON.stringify(lines))
+  check('macOS 包 .screenstudio 被插件接管（这就是之前凭空消失的那个）',
+    lines.includes('/Users/jkw/Downloads/Area 2026-08-29 19_27_28.screenstudio'), JSON.stringify(lines))
+  check('路径行没有重复', new Set(lines).size === lines.length, JSON.stringify(lines))
+  check('共有 2 行路径（暂存 + 包）', lines.length === 2, JSON.stringify(lines))
+
+  const received = window.__nativeReceived.flat()
+  check('官方收到了 mp4', received.filter((n) => n.endsWith('.mp4')).length === 1, JSON.stringify(received))
+  check('官方收到了 jpg', received.includes('摄像头构图对比.jpg'), JSON.stringify(received))
+  check('官方收到了 .lnk（它是文件，不是包）', received.includes('百度网盘.lnk'), JSON.stringify(received))
+  check('官方没有收到包（否则会静默消失）',
+    !received.includes('Area 2026-08-29 19_27_28.screenstudio'), JSON.stringify(received))
+  check('官方没有收到目录（否则会红框报错）', !received.includes('暂存'), JSON.stringify(received))
+  check('官方收到 3 个文件（mp4 + jpg + lnk）', received.length === 3, JSON.stringify(received))
+
+  log('\n' + (failures === 0 ? '全部通过 ✅' : '失败 ' + failures + ' 项 ❌'))
+  out.className = failures === 0 ? 'ok' : 'bad'
+  document.title = failures === 0 ? 'PASS' : 'FAIL'
+}
+</script>
+</body></html>

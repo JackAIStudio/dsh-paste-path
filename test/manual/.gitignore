@@ -1,0 +1,5 @@
+# 构建时自动生成的软链（指向本机 JackDSH 里的 Lexical）
+dsl/
+# 插件打包产物的测试副本
+plugin-client.js
+probe-lib.js

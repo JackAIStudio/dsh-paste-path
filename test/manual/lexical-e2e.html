@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><title>插件 × 真实 Lexical 端到端实测</title>
+<style>
+ body{font:14px -apple-system,sans-serif;margin:20px}
+ [data-composer-card]{border:1px solid #cbd5e1;border-radius:12px;padding:10px;max-width:900px;background:#fff}
+ [data-composer-input]{min-height:110px;outline:none;font:13px/20px ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-all}
+ pre{background:#0f172a;color:#e2e8f0;padding:12px;font-size:12px;white-space:pre-wrap;max-width:900px;border-radius:8px}
+ .ok{color:#4ade80}.bad{color:#f87171}
+</style>
+<script type="importmap">
+{"imports":{"lexical":"./dsl/lexical/Lexical.prod.mjs","@lexical/plain-text":"./dsl/@lexical/plain-text/LexicalPlainText.prod.mjs","@lexical/clipboard":"./dsl/@lexical/clipboard/LexicalClipboard.prod.mjs","@lexical/dragon":"./dsl/@lexical/dragon/LexicalDragon.prod.mjs","@lexical/extension":"./dsl/@lexical/extension/LexicalExtension.prod.mjs","@lexical/selection":"./dsl/@lexical/selection/LexicalSelection.prod.mjs","@lexical/utils":"./dsl/@lexical/utils/LexicalUtils.prod.mjs","@lexical/html":"./dsl/@lexical/html/LexicalHtml.prod.mjs"}}
+</script>
+</head>
+<body>
+<h3>插件本体 × 真实 Lexical 0.49 + plain-text（与 DSH 完全一致）</h3>
+<div data-composer-card><div data-composer-input contenteditable="true"></div></div>
+<pre id="out">运行中…</pre>
+
+<script type="module">
+import { createEditor, $getRoot, $createParagraphNode, $createTextNode } from 'lexical'
+import { registerPlainText } from '@lexical/plain-text'
+
+const edEl = document.querySelector('[data-composer-input]')
+const out = document.getElementById('out')
+const editor = createEditor({ namespace: 'e2e', onError: (e) => console.error('EDITOR ERR', e) })
+editor.setRootElement(edEl)
+registerPlainText(editor)
+
+const L = []; const log = (s) => { L.push(s); out.textContent = L.join('\n') }
+let failures = 0
+
+function setText(t) {
+  editor.update(() => {
+    const r = $getRoot(); r.clear()
+    const p = $createParagraphNode()
+    if (t) p.append($createTextNode(t))
+    r.append(p)
+  }, { discrete: true })
+  // 模型改了还要把 DOM 光标放到末尾，才等价于「用户刚打完这行字」。
+  // 不这么做的话光标停在开头，测出来的行为不是真实用户的场景。
+  edEl.focus()
+  const sel = window.getSelection()
+  const range = document.createRange()
+  range.selectNodeContents(edEl)
+  range.collapse(false)
+  sel.removeAllRanges()
+  sel.addRange(range)
+}
+function paragraphs() { return [...edEl.children].map((c) => c.textContent) }
+function stateText() { let c=''; editor.getEditorState().read(() => { c = $getRoot().getTextContent() }); return c }
+
+// 载入插件本体（打包产物，与运行时同一份）。
+// client.js 是给 DSH 模块加载器用的：它调用 window.__ModuleLoader__.load({id, factory})，
+// 所以这里先放一个最小加载器把 factory 接住并执行，等价于 DSH 的加载流程。
+let pluginRegistration = null
+window.__ModuleLoader__ = {
+  load(reg) { pluginRegistration = reg },
+}
+const script = document.createElement('script')
+script.src = './plugin-client.js'
+script.onload = () => {
+  if (!pluginRegistration) { out.textContent = '❌ 插件没有向模块加载器注册'; document.title='FAIL'; return }
+  try {
+    const face = pluginRegistration.factory((name) => {
+      if (name === 'react') return {}
+      throw new Error('unexpected require: ' + name)
+    })
+    if (!face || typeof face.apply !== 'function') {
+      out.textContent = '❌ factory 没有返回带 apply 的模块'
+      document.title = 'FAIL'
+      return
+    }
+    face.apply({ effect: () => {} })
+    if (!window.__dshPastePath__) {
+      out.textContent = '❌ apply 后没有暴露调试接口'
+      document.title = 'FAIL'
+      return
+    }
+    setTimeout(boot, 200)
+  } catch (e) {
+    out.textContent = '❌ 执行插件 factory 失败: ' + e.message
+    document.title = 'FAIL'
+  }
+}
+script.onerror = () => { out.textContent = '❌ 插件加载失败' }
+document.head.appendChild(script)
+
+const P_APP = '/Applications/青椒云电脑.app'
+const P_CLOCK = '/System/Applications/Clock.app'
+const P_LONG = '/Users/jkw/Library/Mobile Documents/com~apple~CloudDocs/checkouts/SelectedTextKit/Sources/SelectedTextKit/Utilities'
+const api = () => window.__dshPastePath__
+
+/**
+ * 校验非空段落序列。
+ * 空段落是**有意保留**的分隔（用户要求"文字与路径之间空一行"），
+ * 所以这里只看非空段落，空行单独由 blankBetweenTextAndPaths 校验。
+ */
+function check(label, expectedParagraphs) {
+  const got = paragraphs().map((v) => v.trim()).filter((v) => v !== '')
+  const exp = expectedParagraphs.filter((v) => v !== '')
+  const same = got.length === exp.length && got.every((v, i) => v === exp[i])
+  if (same) log('  ✅ ' + label)
+  else { failures++; log('  ❌ ' + label + '\n     实际: ' + JSON.stringify(got) + '\n     期望: ' + JSON.stringify(exp)) }
+}
+
+/** 文字与路径之间是否恰好有一个空行。 */
+function checkBlankSeparator(label) {
+  const got = paragraphs().map((v) => v.trim())
+  const firstPathIdx = got.findIndex((v) => v.startsWith('/'))
+  const textIdx = got.findIndex((v, i) => v !== '' && i < (firstPathIdx === -1 ? got.length : firstPathIdx))
+  const okSep = firstPathIdx > 0 && textIdx !== -1 && got.slice(textIdx + 1, firstPathIdx).filter((v) => v === '').length >= 1
+  if (okSep) log('  ✅ ' + label)
+  else { failures++; log('  ❌ ' + label + '\n     段落: ' + JSON.stringify(got)) }
+}
+
+/** 每条路径是否恰好占一个段落且只出现一次。 */
+function checkOnePerLine(label, paths) {
+  const got = paragraphs().map((v) => v.trim()).filter((v) => v !== '')
+  let bad = 0
+  for (const p of paths) {
+    const n = got.filter((v) => v === p).length
+    if (n !== 1) { bad++; log('  ❌ ' + label + '：' + p + ' 出现 ' + n + ' 次') }
+  }
+  if (bad === 0) log('  ✅ ' + label)
+  else failures++
+}
+
+async function boot() {
+  if (!api()) { out.textContent = '❌ window.__dshPastePath__ 不存在'; document.title='FAIL'; return }
+  log('✅ 插件已加载（走真实 Lexical 环境）\n')
+
+  // 1) 空框插两条 → 两个独立段落
+  setText(''); api().reset()
+  await api().insert(P_APP)
+  await api().insert(P_CLOCK)
+  check('空框插两条 → 各自独立段落', [P_APP, P_CLOCK])
+
+  // 2) 重复插同一个 → 不重复
+  await api().insert(P_CLOCK)
+  await api().insert(P_CLOCK)
+  check('重复插入不产生重复', [P_APP, P_CLOCK])
+
+  // 3) 超长带空格路径
+  await api().insert(P_LONG)
+  check('超长带空格路径独占段落', [P_APP, P_CLOCK, P_LONG])
+
+  // 4) 用户文字在上 → 文字与路径分开
+  setText('帮我看一下这个应用'); api().reset()
+  await api().insert(P_APP)
+  check('用户文字与路径分开成段', ['帮我看一下这个应用', P_APP])
+  checkBlankSeparator('文字与路径之间有空行')
+  checkOnePerLine('每条路径独占一行且唯一', [P_APP])
+
+  // 5) 同批两条 + 重复调用
+  setText(''); api().reset()
+  await api().insert([P_APP, P_LONG])
+  await api().insert([P_APP, P_LONG])
+  check('同批去重', [P_APP, P_LONG])
+
+  // 6) 编辑器状态与 DOM 一致（防止"看着对、实际没进模型"）
+  const domP = paragraphs().join('\n')
+  const modelT = stateText().replace(/\n+/g, '\n').trim()
+  const domT = domP.replace(/\n+/g, '\n').trim()
+  if (domT === modelT) log('  ✅ 编辑器模型状态与 DOM 一致（内容真的进了模型）')
+  else { failures++; log('  ❌ 模型与 DOM 不一致\n     DOM: ' + JSON.stringify(domT) + '\n     模型: ' + JSON.stringify(modelT)) }
+
+  // 7) 清空后能重新插入
+  setText(''); api().reset()
+  await api().insert(P_APP)
+  api().clear()
+  await api().insert(P_APP)
+  check('清空后可重新插入', [P_APP])
+
+  log('\n' + (failures === 0 ? '全部通过 ✅' : '失败 ' + failures + ' 项 ❌'))
+  out.className = failures === 0 ? 'ok' : 'bad'
+  document.title = failures === 0 ? 'PASS' : 'FAIL'
+}
+</script>
+</body></html>

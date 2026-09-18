@@ -1,3 +1,4 @@
+/* Toast 提示 */
 .dshpp-toast {
   position: fixed;
   right: 20px;
@@ -21,15 +22,14 @@
   color: #ffffff;
 }
 
-/* 拖拽时输入框高亮，轻巧优雅，不挡视线 */
-[data-composer-card].dshpp-drag-over,
-div[data-composer-input="true"].dshpp-drag-over {
+/* 拖拽时输入框高亮（用 .dshpp-drag-over 类名，不依赖 data 属性的取值形式） */
+.dshpp-drag-over {
   border-color: var(--dsw-alias-brand-primary, #2563eb) !important;
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.3) !important;
   transition: all 120ms ease;
 }
 
-/* 彻底隐藏原生容易卡死且限制图片的全屏蒙层 */
+/* 隐藏原生可能弹出的全屏阻断蒙层 */
 div[role="status"]:has(> div[class*="illustration"]),
 div[class*="_mask"]:has(div[class*="_illustration"]),
 div[class*="BInVoG_mask"] {

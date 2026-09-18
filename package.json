@@ -1,7 +1,7 @@
 {
   "name": "dsh-paste-path",
-  "version": "0.2.0",
-  "description": "DeepSeek Harness plugin: Smart drag-and-drop for any files/folders and clipboard file path pasting (Native Paste / Button)",
+  "version": "0.3.0",
+  "description": "DeepSeek Harness plugin: turns dragged folders and macOS .app bundles into a plain absolute-path line in the composer (native handling stays untouched)",
   "type": "module",
   "main": "./index.js",
   "exports": {
@@ -19,25 +19,18 @@
     "README.md",
     "LICENSE"
   ],
-  "peerDependencies": {
-    "@deepseek-ai/dsh-client-ui-slots": ">=0.0.1-rc.1 <0.1.0 || >=0.1.0-rc.1 <0.2.0-0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
-  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
     },
     "client": {
-      "inject": [
-        "@deepseek-ai/dsh-client-ui-slots"
-      ],
       "platform": "web"
     }
   },
   "scripts": {
     "pack": "node scripts/pack-client.js",
-    "test": "node scripts/pack-client.js && node --check index.js && node --check paths.js && node --check client.js"
+    "probe": "node test/manual/build-probe.js && cp client.js test/manual/plugin-client.js",
+    "test": "node scripts/pack-client.js && node --check index.js && node --check paths.js && node --check client.js && node --test test/paths.test.js test/client.test.js"
   },
   "keywords": [
     "dsh",
