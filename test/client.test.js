@@ -149,6 +149,49 @@ test('分类严格互补：任取一个文件，要么归我们、要么归官�
   }
 })
 
+test('访达 Cmd+V 粘贴（clipboard 常常没有 webkitGetAsEntry）仍能认出目录', () => {
+  // Chromium 从访达粘贴文件夹时，items 有 kind=file，但 webkitGetAsEntry 可能缺席。
+  // 必须靠 isDirectoryLike（无扩展名 + 空 MIME）判成目录，否则官方会去上传并红框失败。
+  const mkPaste = (name, type) => ({ kind: 'file', getAsFile: () => ({ name, type }) })
+  const dt = {
+    files: [{ name: '暂存', type: '' }],
+    items: [
+      mkPaste('image.png', 'image/png'),
+      mkPaste('暂存', ''),
+      mkPaste('说明.md', ''),
+    ],
+  }
+  const { targets, natives } = I.classifyTransfer(dt)
+  assert.deepEqual(targets.map((f) => f.name), ['暂存'])
+  assert.deepEqual(natives.map((f) => f.name).sort(), ['image.png', '说明.md'].sort())
+})
+
+test('粘贴截图不得拦截：纯图片必须放行给官方多模态', () => {
+  const dt = {
+    files: [{ name: 'image.png', type: 'image/png' }],
+    items: [{ kind: 'file', getAsFile: () => ({ name: 'image.png', type: 'image/png' }) }],
+  }
+  const { targets, natives } = I.classifyTransfer(dt)
+  assert.equal(targets.length, 0)
+  assert.deepEqual(natives.map((f) => f.name), ['image.png'])
+})
+
+test('getAsFile 对目录返回 null 时，用 entry.name 占位，不能把事件吞掉却插不了路径', () => {
+  const dt = {
+    files: [],
+    items: [
+      {
+        kind: 'file',
+        webkitGetAsEntry: () => ({ isDirectory: true, name: '暂存' }),
+        getAsFile: () => null,
+      },
+    ],
+  }
+  const { targets, natives } = I.classifyTransfer(dt)
+  assert.equal(natives.length, 0)
+  assert.deepEqual(targets.map((f) => f.name), ['暂存'])
+})
+
 test('collectTargets 去重并同时看 files 与 items', () => {
   const dt = {
     files: [{ name: 'A.app', type: '' }, { name: 'note.md', type: '' }],
@@ -261,6 +304,11 @@ test('源码必须保留实测得出的关键约定（改错就全盘失效）',
 
   // 4) 绝不接管发送按钮
   assert.doesNotMatch(src, /stopImmediatePropagation\(\)[\s\S]{0,200}send/i, '不得接管发送')
+
+  // 5) 必须拦截输入框里的 Cmd+V：官方 PASTE_COMMAND 会把目录当附件上传并红框失败。
+  //    v0.3 回归过一次（只拦了 drop，粘贴只留 ⌘⇧V），测试守住别再拿掉。
+  assert.match(src, /addEventListener\("paste", onPaste, true\)/, '必须在捕获阶段监听 paste')
+  assert.match(src, /async function onPaste/, '必须有 onPaste 分流')
 })
 
 test('代码里不得引用 Lexical 模块级 helper（插件作用域拿不到，会直接抛错）', () => {

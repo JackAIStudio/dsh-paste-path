@@ -116,11 +116,15 @@ function isDirectoryLike(file) {
 }
 
 /**
- * 按 elements 精确分类一次拖拽里的文件。
+ * 按 items 精确分类一次拖拽 / 粘贴里的文件。
  *
  * 为什么用 dataTransfer.items 逐项判断而不是只看 files：
- * macOS 从访达拖拽时，dataTransfer.files 的顺序与可见顺序无关，
+ * macOS 从访达拖拽或 Cmd+C 时，dataTransfer.files 的顺序与可见顺序无关，
  * 只有 items 能按屏幕上的顺序对应到具体文件，也才能判断哪一项是目录。
+ *
+ * 粘贴时 webkitGetAsEntry 可能缺席（Chromium 对 clipboard 不如 drop 完整），
+ * 这时退回 isDirectoryLike(file)——无扩展名 + 空 MIME 的项按目录处理。
+ * getAsFile() 对目录偶尔返回 null，此时用 entry.name 凑一个占位，避免拦了事件却插不了路径。
  *
  * @returns { targets, natives } —— targets 是归我们管的目录/.app，
  *          natives 是官方能处理的图片/普通文件。
@@ -140,6 +144,7 @@ function classifyTransfer(dataTransfer) {
       targets.push(file)
       return
     }
+    if (!file) return
     if (seenN.has(key)) return
     seenN.add(key)
     natives.push(file)
@@ -151,12 +156,14 @@ function classifyTransfer(dataTransfer) {
       const item = items[i]
       if (item.kind !== "file") continue
       let isDir = false
+      let entry = null
       if (typeof item.webkitGetAsEntry === "function") {
-        const entry = item.webkitGetAsEntry()
+        entry = item.webkitGetAsEntry()
         if (entry && entry.isDirectory) isDir = true
       }
       const file = typeof item.getAsFile === "function" ? item.getAsFile() : null
-      take(file, isDir)
+      const named = file || (entry && entry.name ? { name: entry.name, type: "", size: 0 } : null)
+      take(named, isDir)
     }
     return { targets, natives }
   }
@@ -902,7 +909,7 @@ async function attachTargets(targets) {
   try {
     const resolved = await resolveViaHost(list)
     if (resolved.length === 0) {
-      showToast("没识别出绝对路径。可先在访达里选中它按 Cmd+C，再拖进来或用 ⌘⇧V", true)
+      showToast("没识别出绝对路径。可先在访达里选中它按 Cmd+C，再拖进来或用 ⌘V", true)
       return 0
     }
     return appendPathLines(resolved)
@@ -1029,20 +1036,90 @@ function onChange(e) {
 }
 
 /* ==========================================================================
+   粘贴（⌘V / Ctrl+V）
+   ==========================================================================
+   官方 Lexical PASTE_COMMAND 会把 clipboard 里 kind=file 的每一项都丢给
+   intakeFiles 去上传。目录 / macOS 包没有字节流（EISDIR）→ 红框「上传失败」。
+   拖拽已经在 onDrop 里分流过了；粘贴必须同样处理，否则访达 Cmd+C 再 Cmd+V
+   目录就会失败，而拖同一项却成功。
+
+   规则与 drop 完全对称：
+     - 没有目录/.app → 一步都不插手（截图、.md、.png 继续走官方）
+     - 有目录/.app → 整次粘贴由我们接管，目录插路径，普通文件补发给官方
+*/
+function eventInComposer(e) {
+  const hit = (node) => {
+    if (!node || typeof node.closest !== "function") return false
+    return Boolean(node.closest("[data-composer-input], [data-composer-card]"))
+  }
+  if (hit(e && e.target)) return true
+  if (typeof document !== "undefined" && hit(document.activeElement)) return true
+  return false
+}
+
+async function onPaste(e) {
+  // 补发给官方的合成 drop 不会走到这里；保险起见仍挡一下。
+  if (handingOff) return
+  const cd = e.clipboardData
+  if (!cd) return
+  if (!eventInComposer(e)) return
+
+  const { targets, natives } = classifyTransfer(cd)
+  reportDiag({
+    event: "paste",
+    rawFiles: Array.from((cd.files) || []).map(describeFile),
+    targetNames: targets.map((f) => (f && f.name) || null),
+    nativeNames: natives.map((f) => (f && f.name) || null),
+  })
+  if (targets.length === 0) {
+    // 截图、普通文件、纯文本 → 完全交给官方。
+    return
+  }
+
+  // 必须拦死：官方 PASTE_COMMAND 会对目录取字节流并弹红框「上传失败」。
+  swallow(e)
+
+  if (natives.length > 0) {
+    const filtered = buildNativeTransfer(natives)
+    if (filtered) handOffToNative(filtered)
+  }
+
+  if (pasteInFlight || dropHandling) return
+  pasteInFlight = true
+  try {
+    const named = targets.filter((f) => f && f.name)
+    if (named.length > 0) {
+      await attachTargets(named)
+      return
+    }
+    // 目录项没有 File 对象时，退回读系统剪贴板（NSFilenamesPboardType）。
+    await pasteClipboardPathsUnlocked()
+  } catch (err) {
+    showToast((err && err.message) || "读取剪贴板路径失败", true)
+  } finally {
+    pasteInFlight = false
+  }
+}
+
+/* ==========================================================================
    剪贴板：⌘⇧V / Ctrl+Shift+V 手动兜底
    ========================================================================== */
 let pasteInFlight = false
+async function pasteClipboardPathsUnlocked() {
+  const res = await requestJson(PASTE_ROUTE, { method: "POST" })
+  const paths = Array.isArray(res && res.paths) ? res.paths.map(normalizePath).filter(Boolean) : []
+  if (paths.length === 0) {
+    showToast("剪贴板里没有文件路径。先在访达选中它按 Cmd+C，再按 ⌘V", true)
+    return 0
+  }
+  return appendPathLines(paths)
+}
+
 async function pasteClipboardPaths() {
   if (pasteInFlight) return 0
   pasteInFlight = true
   try {
-    const res = await requestJson(PASTE_ROUTE, { method: "POST" })
-    const paths = Array.isArray(res && res.paths) ? res.paths.map(normalizePath).filter(Boolean) : []
-    if (paths.length === 0) {
-      showToast("剪贴板里没有文件路径。先在访达选中它按 Cmd+C，再按 ⌘⇧V", true)
-      return 0
-    }
-    return await appendPathLines(paths)
+    return await pasteClipboardPathsUnlocked()
   } catch (err) {
     showToast((err && err.message) || "读取剪贴板路径失败", true)
     return 0
@@ -1072,6 +1149,7 @@ function apply(ctx) {
     window.addEventListener("dragover", onDragOver, true)
     window.addEventListener("dragleave", onDragLeave, true)
     window.addEventListener("drop", onDrop, true)
+    window.addEventListener("paste", onPaste, true)
     window.addEventListener("change", onChange, true)
     window.addEventListener("keydown", onKeyDown, true)
 
@@ -1080,6 +1158,7 @@ function apply(ctx) {
       window.removeEventListener("dragover", onDragOver, true)
       window.removeEventListener("dragleave", onDragLeave, true)
       window.removeEventListener("drop", onDrop, true)
+      window.removeEventListener("paste", onPaste, true)
       window.removeEventListener("change", onChange, true)
       window.removeEventListener("keydown", onKeyDown, true)
       if (toastTimer !== null) clearTimeout(toastTimer)

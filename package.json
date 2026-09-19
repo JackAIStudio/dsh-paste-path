@@ -1,7 +1,7 @@
 {
   "name": "dsh-paste-path",
-  "version": "0.3.0",
-  "description": "DeepSeek Harness plugin: turns dragged folders and macOS .app bundles into a plain absolute-path line in the composer (native handling stays untouched)",
+  "version": "0.3.1",
+  "description": "DeepSeek Harness plugin: turns dragged or pasted folders and macOS .app bundles into a plain absolute-path line in the composer (native handling stays untouched)",
   "type": "module",
   "main": "./index.js",
   "exports": {
