@@ -13,6 +13,7 @@ import {
   inspectSinglePath,
   fastFindAppPath,
   fastFindByName,
+  macNameVariants,
 } from './paths.js'
 
 const execFileAsync = promisify(execFile)
@@ -216,13 +217,30 @@ async function fallbackFindPath(name, size) {
     }
   } catch {}
 
-  // 3. mdfind 兜底
+  // 3. mdfind 兜底。
+  //
+  // 查询词要用 Finder 显示形态（磁盘上的冒号换成斜杠）：实测
+  // `mdfind -name 'Area 2026-09-22 20:40:01.screenstudio'` 对没被 Spotlight
+  // 索引好的目录零命中，而 `Area 2026-09-22 20/40/01.screenstudio` 能命中。
+  // 拿回结果后 basename 再按同一套规则归一化比对，否则精确筛选会把真命中筛掉。
   try {
-    const { stdout } = await execFileAsync('mdfind', ['-name', name], { timeout: 2000 })
-    const lines = stdout.split('\n').map(l => l.trim()).filter(Boolean)
+    const queryForms = [...new Set(macNameVariants(name).map(f => f.replace(/:/g, '/')))]
+    const lines = []
+    for (const form of queryForms) {
+      try {
+        const { stdout } = await execFileAsync('mdfind', ['-name', form], { timeout: 2000 })
+        for (const line of stdout.split('\n')) {
+          const value = line.trim()
+          if (value && !lines.includes(value)) lines.push(value)
+        }
+      } catch {}
+      if (lines.length > 0) break
+    }
     if (lines.length === 0) return null
 
-    const exact = lines.filter(p => path.basename(p) === name)
+    const canonical = (value) => String(value).replace(/:/g, '/')
+    const wanted = canonical(name)
+    const exact = lines.filter(p => canonical(path.basename(p)) === wanted)
 
     // 体积只能用于普通文件；目录的 stat.size 是元数据大小，拿来比会误判。
     if (size !== undefined && size > 0) {

@@ -111,9 +111,15 @@ Lexical 的辅助函数（`$getRoot` / `$getSelection` / `$isRangeSelection`）�
 之后所有操作都走节点/选区的公开方法：`getLastChild` / `getTextContent` /
 `selectEnd` / `insertParagraph` / `insertText`。
 
-### 三、前端**拿不到**拖入项的绝对路径，必须靠服务端找回来
+### 三、路径来源：桌面壳给的精确路径优先，服务端搜索只做兜底
 
-这是个硬限制，不是 bug：
+**2026-09-23 起，这一格已经从根上接上了。** 桌面壳（JackDSH）的 `preload.cjs` 现在用
+Electron 官方 API `webUtils.getPathForFile(file)` 把拖入项的真实路径桥给页面
+（`window.jackdshNative.getPathForFile`），插件侧 `directPaths()` 第一优先就用它：
+**路径是精确的，不需要搜索，也不会认错同名文件。**
+
+只有在**浏览器里直接打开**（3080 那种没有壳的入口）时这一层才不存在，退回下面这条
+服务端搜索的老路。下面保留这段历史背景，是为了解释兜底为什么长成现在这样：
 
 ```
 JackDSH 的 main/index.js:
@@ -138,8 +144,9 @@ Electron 又移除了 File.path
 「下载」里没被 Spotlight 索引的目录是**零命中**；而 `mdfind -name 暂存` 有 18 条命中，
 真路径埋在里面（目录不是普通文件，无法用体积比对筛）。所以第 1 级才是主力。
 
-> 想彻底根治，需要在 JackDSH 的 `preload.cjs` 里用 `webUtils.getPathForFile(file)`
-> 把真实路径暴露给前端。那是改 App 壳（要重新打包），插件侧已用服务端解析兜住。
+> 这条已经落地：JackDSH 的 `src/preload/preload.cjs` 暴露了 `getPathForFile`，
+> 插件侧用 `nativePathOf()` 取精确路径。改壳要重新打包发版，所以现装的旧版
+> 要等下一次 JackDSH 更新才吃到这一层；在那之前服务端搜索仍然兜着。
 
 ### 四、`innerText` 读、去空白比对
 

@@ -16,13 +16,21 @@ import { fileURLToPath } from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
-/** 让 client/app.js 能在 Node 里被求值，取出内部纯函数。 */
-function loadInternals() {
+/**
+ * 让 client/app.js 能在 Node 里被求值，取出内部纯函数。
+ *
+ * windowStub 用来模拟桌面壳（JackDSH 的 preload 桥）：不传就是浏览器环境。
+ */
+function loadInternalsWithWindow(windowStub) {
   const src = readFileSync(join(root, 'client/app.js'), 'utf8')
   const module = { exports: {} }
   const fn = new Function('module', 'exports', 'window', 'document', src + '\n;return module.exports')
-  const exports = fn(module, module.exports, undefined, undefined)
+  const exports = fn(module, module.exports, windowStub, undefined)
   return exports.__internals
+}
+
+function loadInternals() {
+  return loadInternalsWithWindow(undefined)
 }
 
 const I = loadInternals()
@@ -309,6 +317,13 @@ test('源码必须保留实测得出的关键约定（改错就全盘失效）',
   //    v0.3 回归过一次（只拦了 drop，粘贴只留 ⌘⇧V），测试守住别再拿掉。
   assert.match(src, /addEventListener\("paste", onPaste, true\)/, '必须在捕获阶段监听 paste')
   assert.match(src, /async function onPaste/, '必须有 onPaste 分流')
+
+  // 6) 路径必须优先取自桌面壳的 Electron 官方桥（webUtils.getPathForFile）。
+  //    这是唯一精确的路径来源；拿掉它就退回「按文件名去文件系统里猜」，
+  //    工作目录（~/Screen Studio Projects 这类）会直接猜不中。
+  assert.match(src, /jackdshNative/, '必须读桌面壳暴露的能力')
+  assert.match(src, /getPathForFile/, '必须用 Electron 官方的 getPathForFile 取真实路径')
+  assert.match(src, /nativePathOf\(file\) \|\|/, 'directPaths 必须优先用壳给的精确路径')
 })
 
 test('代码里不得引用 Lexical 模块级 helper（插件作用域拿不到，会直接抛错）', () => {
@@ -321,4 +336,54 @@ test('代码里不得引用 Lexical 模块级 helper（插件作用域拿不到�
   for (const name of ['$getRoot', '$getSelection', '$isRangeSelection', '$createParagraphNode']) {
     assert.ok(!code.includes(name), `代码里不得引用 ${name}：它在 Lexical 模块作用域里，插件拿不到`)
   }
+})
+
+/* ------------------------------------------- 桌面壳路径桥（Electron 官方 getPathForFile） */
+
+/** 造一个桌面壳 window 桩：只有 jackdshNative 有意义，其余是空实现。 */
+function shellWindow(bridge) {
+  return {
+    jackdshNative: bridge,
+    addEventListener() {},
+    removeEventListener() {},
+    dispatchEvent() { return true },
+    setTimeout,
+    clearTimeout,
+  }
+}
+
+test('没有桌面壳时（浏览器里打开）路径桥安静返回空', () => {
+  // 3080 是纯浏览器入口，没有 jackdshNative —— 必须安静地退回服务端解析，不能抛错。
+  assert.equal(I.nativePathOf({ name: 'a.app' }), '')
+  assert.equal(I.nativePathOf(null), '')
+  assert.equal(I.nativePathOf(undefined), '')
+
+  const browser = loadInternalsWithWindow(shellWindow(undefined))
+  assert.equal(browser.nativePathOf({ name: 'a.app' }), '')
+})
+
+test('路径桥把原始 File 原样交给壳，拿回精确绝对路径', () => {
+  // 真机背景：这是路径的唯一精确来源。壳内部调的是 webUtils.getPathForFile(file)，
+  // 它只认真实的 File 对象——自己 new 一个 File 是拿不到路径的，所以必须原样传。
+  const seen = []
+  const J = loadInternalsWithWindow(shellWindow({
+    getPathForFile: (file) => {
+      seen.push(file)
+      return '/Users/jkw/Screen Studio Projects/Area 2026-09-22 20:40:01.screenstudio'
+    },
+  }))
+  const file = { name: 'Area 2026-09-22 20/40/01.screenstudio', type: '', size: 224 }
+  assert.equal(J.nativePathOf(file), '/Users/jkw/Screen Studio Projects/Area 2026-09-22 20:40:01.screenstudio')
+  assert.equal(seen.length, 1)
+  assert.equal(seen[0], file, '必须把原始 File 对象原样交给壳')
+})
+
+test('壳给的精确路径优先于已废弃的 file.path，壳抛错时安静降级', () => {
+  const J = loadInternalsWithWindow(shellWindow({ getPathForFile: () => '/Users/jkw/精确.app' }))
+  assert.deepEqual(J.directPaths([{ name: 'x.app', path: '/Users/jkw/旧字段.app' }]), ['/Users/jkw/精确.app'])
+
+  const K = loadInternalsWithWindow(shellWindow({
+    getPathForFile: () => { throw new Error('boom') },
+  }))
+  assert.deepEqual(K.directPaths([{ name: 'x.app', path: '/Users/jkw/旧字段.app' }]), ['/Users/jkw/旧字段.app'])
 })

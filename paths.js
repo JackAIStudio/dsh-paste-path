@@ -68,6 +68,32 @@ export async function inspectSinglePath(filePath) {
 }
 
 /**
+ * macOS 文件名变体：Finder 显示的 `/` 与磁盘上的 `:` 是同一个字符。
+ *
+ * Finder 沿用 HFS 时代的老规矩，把文件名里的 `:` 显示成 `/`。所以同一个屏幕录制
+ * 工程，从访达拖进来时 DataTransfer 里的名字可能是磁盘形态
+ * `Area 2026-09-22 20:40:01.screenstudio`，也可能是显示形态
+ * `Area 2026-09-22 20/40/01.screenstudio`。两个方向都得能对上。
+ *
+ * 注意：含 `/` 的写法不能直接拿去拼路径（会被当成子目录），所以这里只保留能当
+ * 文件名用的形态 —— 磁盘形态。
+ *
+ * @param raw - 拖入项的名字（可能是 Finder 显示形态）。
+ * @returns 可当作文件名的候选名（不会含 `/`）。
+ */
+export function macNameVariants(raw) {
+  const value = String(raw || '').trim()
+  if (value === '') return []
+  const variants = []
+  const push = (candidate) => {
+    if (candidate && !candidate.includes('/') && !variants.includes(candidate)) variants.push(candidate)
+  }
+  push(value)
+  if (value.includes('/')) push(value.replace(/\//g, ':'))
+  return variants
+}
+
+/**
  * 「文件名 → 绝对路径」的快速一层查找。
  *
  * 为什么需要它（这是真机上必须的兜底）：
@@ -86,24 +112,32 @@ export async function inspectSinglePath(filePath) {
  */
 export function fastFindByName(name, depth = 2) {
   if (!name || typeof name !== 'string') return null
-  const base = path.basename(name.trim())
-  if (base === '' || base === '.' || base === '..') return null
+  // 先折算形态、再取最后一段。顺序不能反：`Area 2026-09-22 20/40/01.screenstudio`
+  // 这种 Finder 显示名如果先走 path.basename，会被当成路径而只剩 `01.screenstudio`。
+  const bases = macNameVariants(name.trim())
+    .map((value) => path.basename(value))
+    .filter((value) => value !== '' && value !== '.' && value !== '..')
+  if (bases.length === 0) return null
 
   const home = process.env.HOME || ''
+  // 每项是 [目录, 向下搜索的层数]
   const seeds = [
-    path.join(home, 'Downloads'),
-    path.join(home, 'Desktop'),
-    path.join(home, 'Documents'),
-    path.join(home, 'Movies'),
-    path.join(home, 'Pictures'),
-    path.join(home, 'Music'),
-    path.join(home, 'Library', 'Mobile Documents', 'com~apple~CloudDocs'),
-    '/Applications',
-    '/System/Applications',
-    '/System/Applications/Utilities',
-    '/System/Library/CoreServices',
-    path.join(home, 'Applications'),
-    '/tmp',
+    [path.join(home, 'Downloads'), depth],
+    [path.join(home, 'Desktop'), depth],
+    [path.join(home, 'Documents'), depth],
+    [path.join(home, 'Movies'), depth],
+    [path.join(home, 'Pictures'), depth],
+    [path.join(home, 'Music'), depth],
+    [path.join(home, 'Library', 'Mobile Documents', 'com~apple~CloudDocs'), depth],
+    ['/Applications', depth],
+    ['/System/Applications', depth],
+    ['/System/Applications/Utilities', depth],
+    ['/System/Library/CoreServices', depth],
+    [path.join(home, 'Applications'), depth],
+    ['/tmp', depth],
+    // 家目录只扫一层：工作目录常直接挂在 ~ 下（例如 ~/Screen Studio Projects），
+    // 它不在上面任何种子目录里 —— 拖拽识别失败最常见的现场就在这里。
+    [home, Math.min(depth, 1)],
   ]
 
   const hits = []
@@ -114,15 +148,11 @@ export function fastFindByName(name, depth = 2) {
     hits.push(candidate)
   }
 
-  const consider = (dir) => {
-    const target = path.join(dir, base)
+  const walk = (dir, level, baseName) => {
+    const target = path.join(dir, baseName)
     try {
       if (fs.existsSync(target)) push(target)
     } catch {}
-  }
-
-  const walk = (dir, level) => {
-    consider(dir)
     if (level <= 0) return
     let entries
     try {
@@ -133,17 +163,20 @@ export function fastFindByName(name, depth = 2) {
     for (const entry of entries) {
       if (!entry.isDirectory()) continue
       if (entry.name.startsWith('.')) continue
-      walk(path.join(dir, entry.name), level - 1)
+      walk(path.join(dir, entry.name), level - 1, baseName)
     }
   }
 
-  for (const seed of seeds) {
+  for (const [seed, seedDepth] of seeds) {
     try {
       if (!fs.existsSync(seed)) continue
     } catch {
       continue
     }
-    walk(seed, depth)
+    // 种子目录本身就是目标（例如用户拖的就是 ~/Downloads）：先认下它，
+    // 免得被种子内部更深的同名项抢走 —— 那种结果看着像路径，其实指错了地方。
+    if (bases.includes(path.basename(seed))) push(seed)
+    for (const baseName of bases) walk(seed, seedDepth, baseName)
   }
 
   if (hits.length === 0) return null

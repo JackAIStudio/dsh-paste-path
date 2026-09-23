@@ -801,11 +801,36 @@ function normalizePath(raw) {
 }
 
 /** 直接可从 File 对象拿到的真实路径（Electron 会给 file.path）。 */
+/**
+ * 拖入项的绝对路径 —— 由桌面壳通过 preload 暴露的 Electron 官方 API 提供。
+ *
+ * 为什么之前拿不到：Electron 32 起移除了非标的 `File.path`，而 JackDSH 的 renderer
+ * 关着 nodeIntegration、开着 contextIsolation，所以页面**根本看不到**拖入项的路径。
+ * 插件当时只能让同机服务端拿文件名去文件系统里搜（mdfind / 常见目录扫描）——
+ * 搜不中就是「拖进去没反应」，这是猜，不是解决方案。
+ *
+ * 现在壳里用 webUtils.getPathForFile(file) 把真实路径桥出来：路径是精确的，
+ * 不需要搜索，也不会认错同名文件。浏览器里打开（没有壳）时返回空，
+ * 自动退回服务端按名字解析那条老路。
+ */
+function nativePathOf(file) {
+  if (!file) return ""
+  const bridge = typeof window !== "undefined" ? window.jackdshNative : null
+  if (!bridge || typeof bridge.getPathForFile !== "function") return ""
+  try {
+    const value = bridge.getPathForFile(file)
+    return typeof value === "string" ? value : ""
+  } catch {
+    return ""
+  }
+}
+
 function directPaths(files) {
   const out = []
   for (const file of files) {
     if (!file) continue
     const candidate =
+      nativePathOf(file) ||
       (typeof file.path === "string" && file.path) ||
       (typeof file.filepath === "string" && file.filepath) ||
       ""
@@ -1270,4 +1295,6 @@ module.exports.__internals = {
   textHasPath,
   planInsert,
   normalizePath,
+  nativePathOf,
+  directPaths,
 }

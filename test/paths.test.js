@@ -1,5 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import path from 'node:path'
 import {
   normalizePathCandidate,
   parsePaths,
@@ -7,6 +9,7 @@ import {
   inspectSinglePath,
   fastFindAppPath,
   fastFindByName,
+  macNameVariants,
 } from '../paths.js'
 
 test('normalizePathCandidate trims and handles quotes', () => {
@@ -105,4 +108,34 @@ test('fastFindAppPath 仍然只认标准应用目录，且能兜到通用查找'
   assert.equal(fastFindAppPath('Clock.app'), '/System/Applications/Clock.app')
   assert.equal(fastFindAppPath('mac工作台.app'), '/Applications/mac工作台.app')
   assert.equal(fastFindAppPath('绝不存在-3a9.app'), null)
+})
+
+test('macNameVariants 双向折算 Finder 显示名与磁盘冒号名', () => {
+  // Finder 把磁盘上的 ':' 显示成 '/'，所以同一个包拖进来可能是两种写法。
+  // 含 '/' 的写法不能当文件名用（会被当成子目录），必须折算成磁盘形态。
+  assert.deepEqual(
+    macNameVariants('Area 2026-09-22 20:40:01.screenstudio'),
+    ['Area 2026-09-22 20:40:01.screenstudio'],
+  )
+  assert.deepEqual(
+    macNameVariants('Area 2026-09-22 20/40/01.screenstudio'),
+    ['Area 2026-09-22 20:40:01.screenstudio'],
+  )
+  assert.deepEqual(macNameVariants(''), [])
+})
+
+test('fastFindByName 能在工作目录（家目录一层）里找到 .screenstudio 工程', () => {
+  // 真机背景（2026-09-23）：Screen Studio 的工程落在 ~/Screen Studio Projects/，
+  // 既不在下载/桌面/文稿里，mdfind -name 对这类目录又是零命中 —— 拖拽识别失败的
+  // 现场就在这里。家目录一层搜索是唯一稳定的通道。
+  const hit = fastFindByName('Screen Studio Projects')
+  assert.ok(hit && hit.endsWith('/Screen Studio Projects'), '家目录一层的工作目录应该能找到')
+})
+
+test('fastFindByName 能把 Finder 显示名（含 /）还原成磁盘上的冒号名', () => {
+  const projects = path.join(process.env.HOME || '', 'Screen Studio Projects')
+  if (!fs.existsSync(projects)) return
+  const sample = fs.readdirSync(projects).find((n) => n.includes(':') && n.endsWith('.screenstudio'))
+  if (!sample) return
+  assert.equal(fastFindByName(sample.replace(/:/g, '/')), path.join(projects, sample))
 })
