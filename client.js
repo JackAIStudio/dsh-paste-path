@@ -1404,6 +1404,78 @@ function onGlobalContextMenu(e) {
     })
     return
   }
+
+  // 2. 检查是否在普通图片或图片按钮上
+  const imgTarget =
+    (e.target.tagName === "IMG" ? e.target : (e.target.querySelector && e.target.querySelector("img"))) ||
+    (e.target.closest &&
+      e.target.closest('button[class*="frame"], [class*="MessageImage"]') &&
+      e.target.closest('button[class*="frame"], [class*="MessageImage"]').querySelector("img"))
+
+  if (imgTarget && imgTarget.src && !imgTarget.src.startsWith("data:image/svg")) {
+    e.preventDefault()
+    e.stopPropagation()
+
+    const items = [
+      {
+        label: "复制图片",
+        icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>',
+        onClick: async () => {
+          const ok = await copyImageToClipboard(imgTarget)
+          showToast(ok ? "已复制图片到剪贴板" : "已复制图片地址")
+        },
+      },
+      {
+        label: "复制图片地址",
+        icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>',
+        onClick: () => {
+          navigator.clipboard.writeText(imgTarget.src)
+          showToast("已复制图片地址")
+        },
+      },
+      {
+        label: "在新标签页中打开",
+        icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>',
+        onClick: () => window.open(imgTarget.src, "_blank"),
+      },
+      {
+        label: "下载图片...",
+        icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>',
+        onClick: () => {
+          const a = document.createElement("a")
+          a.href = imgTarget.src
+          a.download = (imgTarget.alt && imgTarget.alt !== "image.png" ? imgTarget.alt : "image") + ".png"
+          document.body.appendChild(a)
+          a.click()
+          a.remove()
+        },
+      },
+    ]
+
+    showContextMenu(e.clientX, e.clientY, items)
+  }
+}
+
+async function copyImageToClipboard(imgEl) {
+  try {
+    const src = imgEl.src || imgEl.currentSrc
+    if (!src) return false
+    const resp = await fetch(src)
+    const blob = await resp.blob()
+    if (blob) {
+      const pngBlob = blob.type === "image/png" ? blob : new Blob([blob], { type: "image/png" })
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob })])
+      return true
+    }
+  } catch (err) {
+    console.warn("[dsh-paste-path] Failed to copy image blob:", err)
+  }
+  try {
+    await navigator.clipboard.writeText(imgEl.src)
+    return false
+  } catch {
+    return false
+  }
 }
 
 /* ==========================================================================
