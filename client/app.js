@@ -1011,6 +1011,9 @@ async function onDrop(e) {
   if (handingOff) return
   if (!hasDragFiles(e)) return
 
+  // 关键：记住所有被拖入文件的精确绝对路径（无论普通文件还是目录）
+  rememberFiles(Array.from((e.dataTransfer && e.dataTransfer.files) || []))
+
   const { targets, natives } = classifyTransfer(e.dataTransfer)
   reportDiag({
     event: "drop",
@@ -1053,6 +1056,7 @@ async function onDrop(e) {
 function onChange(e) {
   const target = e.target
   if (!(target instanceof HTMLInputElement) || target.type !== "file" || !target.files) return
+  rememberFiles(Array.from(target.files || []))
   const targets = Array.from(target.files).filter(isDirectoryLike)
   if (targets.length === 0) return
   swallow(e)
@@ -1088,6 +1092,8 @@ async function onPaste(e) {
   const cd = e.clipboardData
   if (!cd) return
   if (!eventInComposer(e)) return
+
+  rememberFiles(Array.from((cd.files) || []))
 
   const { targets, natives } = classifyTransfer(cd)
   reportDiag({
@@ -1164,6 +1170,227 @@ function onKeyDown(e) {
 }
 
 /* ==========================================================================
+   附件卡片增强（复制绝对路径、在访达中显示、上下文右键菜单）
+   ========================================================================== */
+const attachmentPathMap = new Map()
+
+function rememberFiles(files) {
+  if (!files) return
+  for (const f of files) {
+    if (!f || !f.name) continue
+    const p = nativePathOf(f)
+    if (p) {
+      attachmentPathMap.set(f.name, p)
+      if (typeof f.size === "number") {
+        attachmentPathMap.set(f.name + ":" + f.size, p)
+      }
+    }
+  }
+}
+
+async function resolvePathForCard(card) {
+  if (!card) return ""
+  if (card.dataset.dshppPath) return card.dataset.dshppPath
+
+  const nameEl = card.querySelector('[class*="name"]')
+  const name = nameEl ? nameEl.textContent.trim() : ""
+  if (!name) return ""
+
+  if (attachmentPathMap.has(name)) {
+    const p = attachmentPathMap.get(name)
+    card.dataset.dshppPath = p
+    return p
+  }
+
+  try {
+    const resolved = await resolveViaHost([{ name }])
+    if (resolved && resolved.length > 0 && resolved[0]) {
+      const p = resolved[0]
+      attachmentPathMap.set(name, p)
+      card.dataset.dshppPath = p
+      return p
+    }
+  } catch {}
+
+  return ""
+}
+
+function enhanceCard(card) {
+  if (!card || card.dataset.dshppEnhanced) return
+  card.dataset.dshppEnhanced = "true"
+
+  const removeBtn = card.querySelector('[class*="remove"]')
+  const copyBtn = document.createElement("button")
+  copyBtn.type = "button"
+  copyBtn.className = "dshpp-copy-btn"
+  copyBtn.title = "复制文件绝对路径 (按住 Option 点击卡片亦可)"
+  copyBtn.setAttribute("aria-label", "复制文件绝对路径")
+  copyBtn.innerHTML =
+    '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>' +
+    '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>' +
+    '</svg>'
+
+  copyBtn.addEventListener("click", async (e) => {
+    e.stopPropagation()
+    e.preventDefault()
+
+    const nameEl = card.querySelector('[class*="name"]')
+    const name = nameEl ? nameEl.textContent.trim() : ""
+    const path = await resolvePathForCard(card)
+    const textToCopy = path || name
+
+    if (textToCopy) {
+      try {
+        await navigator.clipboard.writeText(textToCopy)
+        copyBtn.classList.add("is-success")
+        copyBtn.innerHTML =
+          '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
+          '<polyline points="20 6 9 17 4 12"></polyline>' +
+          '</svg>'
+        showToast(path ? "已复制绝对路径：\n" + path : "已复制文件名：" + name)
+        setTimeout(() => {
+          copyBtn.classList.remove("is-success")
+          copyBtn.innerHTML =
+            '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+            '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>' +
+            '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>' +
+            '</svg>'
+        }, 2000)
+      } catch {
+        showToast("复制失败，请重试", true)
+      }
+    }
+  })
+
+  if (removeBtn && removeBtn.parentNode) {
+    removeBtn.parentNode.insertBefore(copyBtn, removeBtn)
+  } else {
+    card.appendChild(copyBtn)
+  }
+
+  card.addEventListener(
+    "click",
+    (e) => {
+      if (e.altKey) {
+        e.stopPropagation()
+        e.preventDefault()
+        copyBtn.click()
+      }
+    },
+    { capture: true }
+  )
+}
+
+function scanAndEnhanceCards() {
+  if (typeof document === "undefined") return
+  const cards = document.querySelectorAll('div[class*="card"]:has([class*="name"])')
+  for (const c of cards) {
+    enhanceCard(c)
+  }
+}
+
+let activeContextMenu = null
+function closeContextMenu() {
+  if (activeContextMenu && activeContextMenu.parentNode) {
+    activeContextMenu.parentNode.removeChild(activeContextMenu)
+  }
+  activeContextMenu = null
+}
+
+function showContextMenu(x, y, items) {
+  closeContextMenu()
+  if (!items || items.length === 0) return
+
+  const menu = document.createElement("div")
+  menu.id = "dshpp-context-menu"
+  menu.className = "dshpp-context-menu"
+
+  for (const item of items) {
+    if (item.type === "separator") {
+      const sep = document.createElement("div")
+      sep.className = "dshpp-menu-divider"
+      menu.appendChild(sep)
+      continue
+    }
+    const row = document.createElement("div")
+    row.className = "dshpp-menu-item"
+    row.innerHTML = (item.icon || "") + "<span>" + item.label + "</span>"
+    row.addEventListener("click", (e) => {
+      e.stopPropagation()
+      closeContextMenu()
+      try { item.onClick && item.onClick() } catch {}
+    })
+    menu.appendChild(row)
+  }
+
+  document.body.appendChild(menu)
+  activeContextMenu = menu
+
+  const rect = menu.getBoundingClientRect()
+  const winW = window.innerWidth
+  const winH = window.innerHeight
+  const left = Math.min(x, winW - rect.width - 12)
+  const top = Math.min(y, winH - rect.height - 12)
+  menu.style.left = Math.max(12, left) + "px"
+  menu.style.top = Math.max(12, top) + "px"
+}
+
+function onGlobalContextMenu(e) {
+  const card = e.target.closest && e.target.closest('div[class*="card"]:has([class*="name"])')
+  if (card) {
+    e.preventDefault()
+    e.stopPropagation()
+
+    const nameEl = card.querySelector('[class*="name"]')
+    const name = nameEl ? nameEl.textContent.trim() : ""
+    resolvePathForCard(card).then((path) => {
+      const items = []
+      if (path) {
+        items.push({
+          label: "复制文件绝对路径",
+          icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>',
+          onClick: () => {
+            navigator.clipboard.writeText(path)
+            showToast("已复制绝对路径：\n" + path)
+          },
+        })
+        if (window.jackdshNative && typeof window.jackdshNative.showItemInFolder === "function") {
+          items.push({
+            label: "在访达中显示",
+            icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>',
+            onClick: () => window.jackdshNative.showItemInFolder(path),
+          })
+        }
+      }
+      if (name) {
+        items.push({
+          label: "复制文件名",
+          icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>',
+          onClick: () => {
+            navigator.clipboard.writeText(name)
+            showToast("已复制文件名：" + name)
+          },
+        })
+      }
+      const removeBtn = card.querySelector('[class*="remove"]')
+      if (removeBtn) {
+        items.push({ type: "separator" })
+        items.push({
+          label: "移除此附件",
+          icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#ef4444" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>',
+          onClick: () => removeBtn.click(),
+        })
+      }
+      if (items.length > 0) {
+        showContextMenu(e.clientX, e.clientY, items)
+      }
+    })
+    return
+  }
+}
+
+/* ==========================================================================
    安装
    ========================================================================== */
 function apply(ctx) {
@@ -1177,6 +1404,18 @@ function apply(ctx) {
     window.addEventListener("paste", onPaste, true)
     window.addEventListener("change", onChange, true)
     window.addEventListener("keydown", onKeyDown, true)
+    window.addEventListener("contextmenu", onGlobalContextMenu, true)
+    window.addEventListener("click", closeContextMenu, true)
+    window.addEventListener("scroll", closeContextMenu, true)
+
+    let cardObserver = null
+    if (typeof MutationObserver !== "undefined") {
+      cardObserver = new MutationObserver(() => {
+        scanAndEnhanceCards()
+      })
+      cardObserver.observe(document.body, { childList: true, subtree: true })
+    }
+    scanAndEnhanceCards()
 
     dispose = () => {
       window.removeEventListener("dragenter", onDragEnter, true)
@@ -1186,6 +1425,11 @@ function apply(ctx) {
       window.removeEventListener("paste", onPaste, true)
       window.removeEventListener("change", onChange, true)
       window.removeEventListener("keydown", onKeyDown, true)
+      window.removeEventListener("contextmenu", onGlobalContextMenu, true)
+      window.removeEventListener("click", closeContextMenu, true)
+      window.removeEventListener("scroll", closeContextMenu, true)
+      if (cardObserver) cardObserver.disconnect()
+      closeContextMenu()
       if (toastTimer !== null) clearTimeout(toastTimer)
     }
 

@@ -2,7 +2,7 @@ window.__ModuleLoader__.load({
   id: 'dsh-paste-path',
   factory: (require) => {
     const module = { exports: {} }
-    const css = "/* Toast 提示 */\n.dshpp-toast {\n  position: fixed;\n  right: 20px;\n  bottom: 84px;\n  max-width: 420px;\n  padding: 8px 14px;\n  border-radius: 8px;\n  background: var(--dsw-alias-bg-layer-3, #1e293b);\n  color: var(--dsw-alias-label-primary, #f8fafc);\n  font-size: 12px;\n  line-height: 18px;\n  pointer-events: none;\n  box-shadow: var(--dsw-shadow-lv3, 0 10px 15px -3px rgba(0, 0, 0, 0.3));\n  z-index: 1000;\n  animation: dshppFadeIn 150ms ease;\n  word-break: break-all;\n}\n\n.dshpp-toast.is-error {\n  background: #dc2626;\n  color: #ffffff;\n}\n\n/* 拖拽时输入框高亮（用 .dshpp-drag-over 类名，不依赖 data 属性的取值形式） */\n.dshpp-drag-over {\n  border-color: var(--dsw-alias-brand-primary, #2563eb) !important;\n  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.3) !important;\n  transition: all 120ms ease;\n}\n\n/* 隐藏原生可能弹出的全屏阻断蒙层 */\ndiv[role=\"status\"]:has(> div[class*=\"illustration\"]),\ndiv[class*=\"_mask\"]:has(div[class*=\"_illustration\"]),\ndiv[class*=\"BInVoG_mask\"] {\n  display: none !important;\n  opacity: 0 !important;\n  pointer-events: none !important;\n}\n\n@keyframes dshppFadeIn {\n  from { opacity: 0; transform: translateY(4px); }\n  to { opacity: 1; transform: translateY(0); }\n}\n"
+    const css = "/* Toast 提示 */\n.dshpp-toast {\n  position: fixed;\n  right: 20px;\n  bottom: 84px;\n  max-width: 420px;\n  padding: 8px 14px;\n  border-radius: 8px;\n  background: var(--dsw-alias-bg-layer-3, #1e293b);\n  color: var(--dsw-alias-label-primary, #f8fafc);\n  font-size: 12px;\n  line-height: 18px;\n  pointer-events: none;\n  box-shadow: var(--dsw-shadow-lv3, 0 10px 15px -3px rgba(0, 0, 0, 0.3));\n  z-index: 1000;\n  animation: dshppFadeIn 150ms ease;\n  word-break: break-all;\n}\n\n.dshpp-toast.is-error {\n  background: #dc2626;\n  color: #ffffff;\n}\n\n/* 拖拽时输入框高亮（用 .dshpp-drag-over 类名，不依赖 data 属性的取值形式） */\n.dshpp-drag-over {\n  border-color: var(--dsw-alias-brand-primary, #2563eb) !important;\n  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.3) !important;\n  transition: all 120ms ease;\n}\n\n/* 隐藏原生可能弹出的全屏阻断蒙层 */\ndiv[role=\"status\"]:has(> div[class*=\"illustration\"]),\ndiv[class*=\"_mask\"]:has(div[class*=\"_illustration\"]),\ndiv[class*=\"BInVoG_mask\"] {\n  display: none !important;\n  opacity: 0 !important;\n  pointer-events: none !important;\n}\n\n@keyframes dshppFadeIn {\n  from { opacity: 0; transform: translateY(4px); }\n  to { opacity: 1; transform: translateY(0); }\n}\n\n/* 彻底修复图片附件左键点击灵敏度：禁止浏览器把微小手抖误判为拖拽 */\n[class*=\"MessageImage\"] img,\n[class*=\"frame\"] img,\ndiv[data-variant=\"single\"] img,\ndiv[data-variant=\"tile\"] img,\ndiv[data-variant=\"thumbnail\"] img {\n  -webkit-user-drag: none !important;\n  user-select: none !important;\n  cursor: pointer !important;\n}\n\n/* 附件卡片上的复制路径快捷按钮 */\n.dshpp-copy-btn {\n  width: 20px;\n  height: 20px;\n  border-radius: 50%;\n  background: var(--dsw-alias-button-contrast-fill, rgba(0, 0, 0, 0.72));\n  color: var(--dsw-alias-label-primary-inverted, #ffffff);\n  opacity: 0;\n  cursor: pointer;\n  border: none;\n  display: inline-flex;\n  justify-content: center;\n  align-items: center;\n  padding: 0;\n  position: absolute;\n  top: 6px;\n  right: 28px;\n  transition: opacity 0.15s ease-in-out, transform 0.1s ease, background 0.15s ease;\n  z-index: 5;\n}\n\n[class*=\"card\"]:hover .dshpp-copy-btn,\n[class*=\"card\"]:focus-within .dshpp-copy-btn,\n.dshpp-copy-btn:focus-visible {\n  opacity: 0.85;\n}\n\n.dshpp-copy-btn:hover {\n  opacity: 1 !important;\n  transform: scale(1.1);\n}\n\n.dshpp-copy-btn.is-success {\n  background: #10b981 !important;\n  color: #ffffff !important;\n  opacity: 1 !important;\n}\n\n/* 自定义右键菜单样式 */\n.dshpp-context-menu {\n  position: fixed;\n  z-index: 99999;\n  background: var(--dsw-alias-bg-layer-3, #1e293b);\n  color: var(--dsw-alias-label-primary, #f8fafc);\n  border: 1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.15));\n  border-radius: 8px;\n  padding: 5px;\n  min-width: 170px;\n  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);\n  font-size: 13px;\n  font-family: inherit;\n  user-select: none;\n  animation: dshppMenuFade 100ms cubic-bezier(0.16, 1, 0.3, 1);\n}\n\n@keyframes dshppMenuFade {\n  from { opacity: 0; transform: scale(0.96); }\n  to { opacity: 1; transform: scale(1); }\n}\n\n.dshpp-menu-item {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  padding: 6px 10px;\n  border-radius: 6px;\n  cursor: pointer;\n  transition: background 80ms ease;\n  color: inherit;\n}\n\n.dshpp-menu-item:hover {\n  background: var(--dsw-alias-fill-secondary, rgba(255, 255, 255, 0.12));\n}\n\n.dshpp-menu-item svg {\n  flex-shrink: 0;\n  width: 14px;\n  height: 14px;\n  opacity: 0.85;\n}\n\n.dshpp-menu-divider {\n  height: 1px;\n  background: var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.1));\n  margin: 4px 2px;\n}\n"
     if (typeof document !== 'undefined') {
       const id = 'dsh-paste-path/ui.css'
       let tag = document.querySelector('style[data-plugin-css=' + JSON.stringify(id) + ']')
@@ -1027,6 +1027,9 @@ async function onDrop(e) {
   if (handingOff) return
   if (!hasDragFiles(e)) return
 
+  // 关键：记住所有被拖入文件的精确绝对路径（无论普通文件还是目录）
+  rememberFiles(Array.from((e.dataTransfer && e.dataTransfer.files) || []))
+
   const { targets, natives } = classifyTransfer(e.dataTransfer)
   reportDiag({
     event: "drop",
@@ -1069,6 +1072,7 @@ async function onDrop(e) {
 function onChange(e) {
   const target = e.target
   if (!(target instanceof HTMLInputElement) || target.type !== "file" || !target.files) return
+  rememberFiles(Array.from(target.files || []))
   const targets = Array.from(target.files).filter(isDirectoryLike)
   if (targets.length === 0) return
   swallow(e)
@@ -1104,6 +1108,8 @@ async function onPaste(e) {
   const cd = e.clipboardData
   if (!cd) return
   if (!eventInComposer(e)) return
+
+  rememberFiles(Array.from((cd.files) || []))
 
   const { targets, natives } = classifyTransfer(cd)
   reportDiag({
@@ -1180,6 +1186,227 @@ function onKeyDown(e) {
 }
 
 /* ==========================================================================
+   附件卡片增强（复制绝对路径、在访达中显示、上下文右键菜单）
+   ========================================================================== */
+const attachmentPathMap = new Map()
+
+function rememberFiles(files) {
+  if (!files) return
+  for (const f of files) {
+    if (!f || !f.name) continue
+    const p = nativePathOf(f)
+    if (p) {
+      attachmentPathMap.set(f.name, p)
+      if (typeof f.size === "number") {
+        attachmentPathMap.set(f.name + ":" + f.size, p)
+      }
+    }
+  }
+}
+
+async function resolvePathForCard(card) {
+  if (!card) return ""
+  if (card.dataset.dshppPath) return card.dataset.dshppPath
+
+  const nameEl = card.querySelector('[class*="name"]')
+  const name = nameEl ? nameEl.textContent.trim() : ""
+  if (!name) return ""
+
+  if (attachmentPathMap.has(name)) {
+    const p = attachmentPathMap.get(name)
+    card.dataset.dshppPath = p
+    return p
+  }
+
+  try {
+    const resolved = await resolveViaHost([{ name }])
+    if (resolved && resolved.length > 0 && resolved[0]) {
+      const p = resolved[0]
+      attachmentPathMap.set(name, p)
+      card.dataset.dshppPath = p
+      return p
+    }
+  } catch {}
+
+  return ""
+}
+
+function enhanceCard(card) {
+  if (!card || card.dataset.dshppEnhanced) return
+  card.dataset.dshppEnhanced = "true"
+
+  const removeBtn = card.querySelector('[class*="remove"]')
+  const copyBtn = document.createElement("button")
+  copyBtn.type = "button"
+  copyBtn.className = "dshpp-copy-btn"
+  copyBtn.title = "复制文件绝对路径 (按住 Option 点击卡片亦可)"
+  copyBtn.setAttribute("aria-label", "复制文件绝对路径")
+  copyBtn.innerHTML =
+    '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>' +
+    '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>' +
+    '</svg>'
+
+  copyBtn.addEventListener("click", async (e) => {
+    e.stopPropagation()
+    e.preventDefault()
+
+    const nameEl = card.querySelector('[class*="name"]')
+    const name = nameEl ? nameEl.textContent.trim() : ""
+    const path = await resolvePathForCard(card)
+    const textToCopy = path || name
+
+    if (textToCopy) {
+      try {
+        await navigator.clipboard.writeText(textToCopy)
+        copyBtn.classList.add("is-success")
+        copyBtn.innerHTML =
+          '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
+          '<polyline points="20 6 9 17 4 12"></polyline>' +
+          '</svg>'
+        showToast(path ? "已复制绝对路径：\n" + path : "已复制文件名：" + name)
+        setTimeout(() => {
+          copyBtn.classList.remove("is-success")
+          copyBtn.innerHTML =
+            '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+            '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>' +
+            '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>' +
+            '</svg>'
+        }, 2000)
+      } catch {
+        showToast("复制失败，请重试", true)
+      }
+    }
+  })
+
+  if (removeBtn && removeBtn.parentNode) {
+    removeBtn.parentNode.insertBefore(copyBtn, removeBtn)
+  } else {
+    card.appendChild(copyBtn)
+  }
+
+  card.addEventListener(
+    "click",
+    (e) => {
+      if (e.altKey) {
+        e.stopPropagation()
+        e.preventDefault()
+        copyBtn.click()
+      }
+    },
+    { capture: true }
+  )
+}
+
+function scanAndEnhanceCards() {
+  if (typeof document === "undefined") return
+  const cards = document.querySelectorAll('div[class*="card"]:has([class*="name"])')
+  for (const c of cards) {
+    enhanceCard(c)
+  }
+}
+
+let activeContextMenu = null
+function closeContextMenu() {
+  if (activeContextMenu && activeContextMenu.parentNode) {
+    activeContextMenu.parentNode.removeChild(activeContextMenu)
+  }
+  activeContextMenu = null
+}
+
+function showContextMenu(x, y, items) {
+  closeContextMenu()
+  if (!items || items.length === 0) return
+
+  const menu = document.createElement("div")
+  menu.id = "dshpp-context-menu"
+  menu.className = "dshpp-context-menu"
+
+  for (const item of items) {
+    if (item.type === "separator") {
+      const sep = document.createElement("div")
+      sep.className = "dshpp-menu-divider"
+      menu.appendChild(sep)
+      continue
+    }
+    const row = document.createElement("div")
+    row.className = "dshpp-menu-item"
+    row.innerHTML = (item.icon || "") + "<span>" + item.label + "</span>"
+    row.addEventListener("click", (e) => {
+      e.stopPropagation()
+      closeContextMenu()
+      try { item.onClick && item.onClick() } catch {}
+    })
+    menu.appendChild(row)
+  }
+
+  document.body.appendChild(menu)
+  activeContextMenu = menu
+
+  const rect = menu.getBoundingClientRect()
+  const winW = window.innerWidth
+  const winH = window.innerHeight
+  const left = Math.min(x, winW - rect.width - 12)
+  const top = Math.min(y, winH - rect.height - 12)
+  menu.style.left = Math.max(12, left) + "px"
+  menu.style.top = Math.max(12, top) + "px"
+}
+
+function onGlobalContextMenu(e) {
+  const card = e.target.closest && e.target.closest('div[class*="card"]:has([class*="name"])')
+  if (card) {
+    e.preventDefault()
+    e.stopPropagation()
+
+    const nameEl = card.querySelector('[class*="name"]')
+    const name = nameEl ? nameEl.textContent.trim() : ""
+    resolvePathForCard(card).then((path) => {
+      const items = []
+      if (path) {
+        items.push({
+          label: "复制文件绝对路径",
+          icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>',
+          onClick: () => {
+            navigator.clipboard.writeText(path)
+            showToast("已复制绝对路径：\n" + path)
+          },
+        })
+        if (window.jackdshNative && typeof window.jackdshNative.showItemInFolder === "function") {
+          items.push({
+            label: "在访达中显示",
+            icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>',
+            onClick: () => window.jackdshNative.showItemInFolder(path),
+          })
+        }
+      }
+      if (name) {
+        items.push({
+          label: "复制文件名",
+          icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>',
+          onClick: () => {
+            navigator.clipboard.writeText(name)
+            showToast("已复制文件名：" + name)
+          },
+        })
+      }
+      const removeBtn = card.querySelector('[class*="remove"]')
+      if (removeBtn) {
+        items.push({ type: "separator" })
+        items.push({
+          label: "移除此附件",
+          icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#ef4444" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>',
+          onClick: () => removeBtn.click(),
+        })
+      }
+      if (items.length > 0) {
+        showContextMenu(e.clientX, e.clientY, items)
+      }
+    })
+    return
+  }
+}
+
+/* ==========================================================================
    安装
    ========================================================================== */
 function apply(ctx) {
@@ -1193,6 +1420,18 @@ function apply(ctx) {
     window.addEventListener("paste", onPaste, true)
     window.addEventListener("change", onChange, true)
     window.addEventListener("keydown", onKeyDown, true)
+    window.addEventListener("contextmenu", onGlobalContextMenu, true)
+    window.addEventListener("click", closeContextMenu, true)
+    window.addEventListener("scroll", closeContextMenu, true)
+
+    let cardObserver = null
+    if (typeof MutationObserver !== "undefined") {
+      cardObserver = new MutationObserver(() => {
+        scanAndEnhanceCards()
+      })
+      cardObserver.observe(document.body, { childList: true, subtree: true })
+    }
+    scanAndEnhanceCards()
 
     dispose = () => {
       window.removeEventListener("dragenter", onDragEnter, true)
@@ -1202,6 +1441,11 @@ function apply(ctx) {
       window.removeEventListener("paste", onPaste, true)
       window.removeEventListener("change", onChange, true)
       window.removeEventListener("keydown", onKeyDown, true)
+      window.removeEventListener("contextmenu", onGlobalContextMenu, true)
+      window.removeEventListener("click", closeContextMenu, true)
+      window.removeEventListener("scroll", closeContextMenu, true)
+      if (cardObserver) cardObserver.disconnect()
+      closeContextMenu()
       if (toastTimer !== null) clearTimeout(toastTimer)
     }
 
